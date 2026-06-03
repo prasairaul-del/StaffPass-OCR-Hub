@@ -461,6 +461,17 @@ async function init() {
     if (event.ctrlKey && event.shiftKey && event.key === 'D') {
       event.preventDefault();
       toggleTheme();
+      return;
+    }
+    if (event.ctrlKey && !event.shiftKey && !event.altKey) {
+      const tabMap = { '1': 'ingestion', '2': 'review', '3': 'records' };
+      const view = tabMap[event.key];
+      if (view) {
+        event.preventDefault();
+        setActiveView(view);
+        render();
+        showToast(view === 'review' ? 'Review Queue' : view[0].toUpperCase() + view.slice(1));
+      }
     }
   });
   bindEvents();
