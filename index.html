@@ -27,13 +27,13 @@
       </div>
 
       <nav class="rail-nav" aria-label="Primary views">
-        <button id="tab-ingestion" class="rail-tab is-active" type="button" aria-controls="ingestion-panel" aria-selected="true" data-tooltip="Upload and process documents for OCR">
+        <button id="tab-ingestion" class="rail-tab is-active" type="button" aria-controls="ingestion-panel" aria-selected="true" data-tooltip="Upload and process documents for OCR (Ctrl+1)">
           Ingestion
         </button>
-        <button id="tab-review-queue" class="rail-tab" type="button" aria-controls="review-panel" aria-selected="false" data-tooltip="Inspect extracted metadata and approve or reject">
+        <button id="tab-review-queue" class="rail-tab" type="button" aria-controls="review-panel" aria-selected="false" data-tooltip="Inspect extracted metadata and approve or reject (Ctrl+2)">
           Review Queue
         </button>
-        <button id="tab-records" class="rail-tab" type="button" aria-controls="records-panel" aria-selected="false" data-tooltip="Browse previously saved staff records">
+        <button id="tab-records" class="rail-tab" type="button" aria-controls="records-panel" aria-selected="false" data-tooltip="Browse previously saved staff records (Ctrl+3)">
           Records
         </button>
       </nav>
@@ -274,6 +274,30 @@
     </aside>
   </div>
 
+  <div id="shortcuts-overlay" class="shortcuts-overlay" role="dialog" aria-labelledby="shortcuts-title" aria-hidden="true">
+    <div class="shortcuts-backdrop"></div>
+    <div class="shortcuts-modal">
+      <div class="shortcuts-header">
+        <h2 id="shortcuts-title" class="shortcuts-title">Keyboard shortcuts</h2>
+        <button id="shortcuts-close" class="shortcuts-close" type="button" aria-label="Close shortcuts panel">&times;</button>
+      </div>
+      <table class="shortcuts-table">
+        <thead>
+          <tr>
+            <th scope="col">Shortcut</th>
+            <th scope="col">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td><kbd>Ctrl</kbd> + <kbd>1</kbd></td><td>Switch to Ingestion tab</td></tr>
+          <tr><td><kbd>Ctrl</kbd> + <kbd>2</kbd></td><td>Switch to Review Queue tab</td></tr>
+          <tr><td><kbd>Ctrl</kbd> + <kbd>3</kbd></td><td>Switch to Records tab</td></tr>
+          <tr><td><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>D</kbd></td><td>Toggle dark mode</td></tr>
+          <tr><td><kbd>Ctrl</kbd> + <kbd>/</kbd></td><td>Show / hide this panel</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <script src="renderer.js"></script>
 </body>

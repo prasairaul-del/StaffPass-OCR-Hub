@@ -438,6 +438,24 @@ function showToast(message) {
   }, 2200);
 }
 
+let previouslyFocusedElement = null;
+
+function toggleShortcutsOverlay() {
+  const overlay = query('shortcuts-overlay');
+  if (!overlay) return;
+  const isHidden = overlay.getAttribute('aria-hidden') === 'true';
+  if (isHidden) {
+    previouslyFocusedElement = document.activeElement;
+    overlay.setAttribute('aria-hidden', 'false');
+    query('shortcuts-close')?.focus();
+  } else {
+    overlay.setAttribute('aria-hidden', 'true');
+    if (previouslyFocusedElement && previouslyFocusedElement.focus) {
+      previouslyFocusedElement.focus();
+    }
+  }
+}
+
 function toggleTheme() {
   const current = document.documentElement.getAttribute('data-theme');
   const next = current === 'dark' ? 'light' : 'dark';
@@ -457,10 +475,28 @@ function loadSavedTheme() {
 async function init() {
   applyTheme(loadSavedTheme());
   query('theme-toggle')?.addEventListener('click', toggleTheme);
+  query('shortcuts-close')?.addEventListener('click', toggleShortcutsOverlay);
+  query('shortcuts-overlay')?.addEventListener('click', (event) => {
+    if (event.target.classList.contains('shortcuts-backdrop')) toggleShortcutsOverlay();
+  });
+
   document.addEventListener('keydown', (event) => {
     if (event.ctrlKey && event.shiftKey && event.key === 'D') {
       event.preventDefault();
       toggleTheme();
+      return;
+    }
+    if (event.ctrlKey && event.key === '/') {
+      event.preventDefault();
+      toggleShortcutsOverlay();
+      return;
+    }
+    if (event.key === 'Escape') {
+      const overlay = query('shortcuts-overlay');
+      if (overlay && overlay.getAttribute('aria-hidden') === 'false') {
+        event.preventDefault();
+        toggleShortcutsOverlay();
+      }
       return;
     }
     if (event.ctrlKey && !event.shiftKey && !event.altKey) {

@@ -729,6 +729,119 @@ textarea:focus-visible,
   border: 0;
 }
 
+/* Keyboard shortcuts overlay */
+.shortcuts-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+}
+
+.shortcuts-overlay[aria-hidden="true"] {
+  display: none;
+}
+
+.shortcuts-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  transition: opacity 0.2s ease;
+}
+
+.shortcuts-modal {
+  position: relative;
+  width: 420px;
+  max-width: 92vw;
+  padding: 20px 24px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+  animation: shortcuts-enter 0.2s ease;
+}
+
+@keyframes shortcuts-enter {
+  from { opacity: 0; transform: scale(0.96) translateY(8px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.shortcuts-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.shortcuts-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.shortcuts-close {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--muted);
+  font-size: 1.4rem;
+  line-height: 1;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.shortcuts-close:hover {
+  background: var(--surface-alt);
+  color: var(--text);
+}
+
+.shortcuts-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.shortcuts-table th {
+  text-align: left;
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+  padding: 0 0 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.shortcuts-table td {
+  padding: 10px 0;
+  font-size: 0.92rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.shortcuts-table tr:last-child td {
+  border-bottom: none;
+}
+
+.shortcuts-table td:first-child {
+  white-space: nowrap;
+  padding-right: 16px;
+}
+
+kbd {
+  display: inline-block;
+  min-width: 24px;
+  padding: 2px 7px;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  background: var(--surface-alt);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.82rem;
+  text-align: center;
+  box-shadow: 0 1px 0 var(--border);
+}
+
 .toast {
   position: fixed;
   bottom: 24px;
