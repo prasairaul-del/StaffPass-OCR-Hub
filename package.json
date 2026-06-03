@@ -1,0 +1,16 @@
+{
+  "name": "staffpass-ocr-hub",
+  "version": "1.0.0",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "mocha tests/**/*.test.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.10.0",
+    "electron": "^30.0.0"
+  },
+  "devDependencies": {
+    "mocha": "^10.4.0"
+  }
+}

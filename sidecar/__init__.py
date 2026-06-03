@@ -1,0 +1,1 @@
+"""StaffPass OCR sidecar package."""

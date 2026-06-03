@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-j/hFBNQCS2J6IP+X/UULn3LgQG1mR4scgjPscTqZHYQ='; style-src 'self'; img-src 'self' data:; connect-src 'self'">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>StaffPass Local OCR Hub</title>
+  <link rel="stylesheet" href="index.css">
+  <script>
+    (function() {
+      try {
+        var theme = localStorage.getItem('staffpass-theme');
+        if (theme === 'dark' || theme === 'light') {
+          document.documentElement.setAttribute('data-theme', theme);
+        }
+      } catch (_e) {}
+    })();
+  </script>
+</head>
+<body>
+  <div id="app" class="app-shell" aria-label="StaffPass OCR workspace">
+    <aside class="app-rail" aria-label="Workspace navigation">
+      <div class="brand-lockup">
+        <p class="brand-kicker">StaffPass</p>
+        <h1 class="brand-title">OCR Hub</h1>
+        <p class="brand-subtitle">Local intake, review, and records</p>
+      </div>
+
+      <nav class="rail-nav" aria-label="Primary views">
+        <button id="tab-ingestion" class="rail-tab is-active" type="button" aria-controls="ingestion-panel" aria-selected="true" data-tooltip="Upload and process documents for OCR">
+          Ingestion
+        </button>
+        <button id="tab-review-queue" class="rail-tab" type="button" aria-controls="review-panel" aria-selected="false" data-tooltip="Inspect extracted metadata and approve or reject">
+          Review Queue
+        </button>
+        <button id="tab-records" class="rail-tab" type="button" aria-controls="records-panel" aria-selected="false" data-tooltip="Browse previously saved staff records">
+          Records
+        </button>
+      </nav>
+
+      <section class="rail-status" aria-labelledby="system-status-title">
+        <div class="theme-toggle-row">
+          <span class="theme-toggle-label">Dark mode</span>
+          <button id="theme-toggle" class="theme-toggle" type="button" role="switch" aria-checked="false" aria-label="Toggle dark mode">
+            <span class="theme-toggle-track">
+              <span class="theme-toggle-thumb"></span>
+            </span>
+          </button>
+        </div>
+        <h2 id="system-status-title" class="section-title">System status</h2>
+        <dl class="status-list">
+          <div>
+            <dt>Queue</dt>
+            <dd id="queue-count">0 awaiting review</dd>
+          </div>
+          <div>
+            <dt>Selected</dt>
+            <dd id="selected-document-state">None</dd>
+          </div>
+          <div>
+            <dt>Mode</dt>
+            <dd id="workspace-mode">Ingestion</dd>
+          </div>
+        </dl>
+      </section>
+    </aside>
+
+    <main class="workspace" aria-label="Document workspace">
+      <header class="workspace-header">
+        <div>
+          <p class="workspace-eyebrow">Operational desktop view</p>
+          <h2 class="workspace-title">Document intake and verification</h2>
+        </div>
+        <div class="workspace-actions" role="group" aria-label="Workspace actions">
+          <button id="refresh-queue-btn" class="tool-button" type="button">Refresh</button>
+          <button id="export-records-btn" class="tool-button" type="button">Export</button>
+        </div>
+      </header>
+
+      <section id="ingestion-panel" class="surface panel panel-wide" aria-labelledby="ingestion-title">
+        <div class="panel-header">
+          <div>
+            <h3 id="ingestion-title" class="panel-title">File intake</h3>
+            <p class="panel-copy">Drop documents here or choose files for OCR processing.</p>
+          </div>
+        <div class="panel-header-actions">
+          <label class="file-button" for="file-input">Select files</label>
+          <button id="process-selected" class="tool-button tool-button-primary" type="button">Run OCR</button>
+          <button id="clear-queue-btn" class="tool-button" type="button">Clear queue</button>
+        </div>
+        </div>
+
+        <div id="drop-zone" class="drop-zone" role="button" tabindex="0" aria-describedby="drop-zone-help" aria-label="Drop files to add them to the queue">
+          <input id="file-input" class="file-input" type="file" accept=".pdf,.png,.jpg,.jpeg,.tif,.tiff" multiple aria-label="Choose documents for OCR">
+          <div class="drop-zone-copy">
+            <strong>Drop files to ingest</strong>
+            <span id="drop-zone-help">PDF, PNG, JPG, TIFF, and similar scans are supported.</span>
+          </div>
+        </div>
+        <p id="app-status" class="app-status" data-tone="neutral" aria-live="polite">Ready for local document intake.</p>
+      </section>
+
+      <section id="review-panel" class="surface panel panel-wide" aria-labelledby="queue-title">
+        <div class="panel-header">
+          <div>
+            <h3 id="queue-title" class="panel-title">Review queue</h3>
+            <p class="panel-copy">Pick a document to inspect extracted metadata and review state.</p>
+          </div>
+          <div class="panel-metrics" aria-label="Queue metrics">
+            <div class="metric">
+              <span class="metric-label">Pending</span>
+              <strong id="pending-count">0</strong>
+            </div>
+            <div class="metric">
+              <span class="metric-label">Needs correction</span>
+              <strong id="correction-count">0</strong>
+            </div>
+          </div>
+        </div>
+
+        <div class="table-frame" role="region" aria-labelledby="queue-title" tabindex="0">
+          <table class="queue-table" id="queue-table">
+            <caption class="sr-only">OCR review queue</caption>
+            <thead>
+              <tr>
+                <th scope="col">Document</th>
+                <th scope="col">Type</th>
+                <th scope="col">Status</th>
+                <th scope="col">Confidence</th>
+                <th scope="col">Updated</th>
+              </tr>
+            </thead>
+            <tbody id="queue-table-body">
+              <tr class="queue-empty">
+                <td colspan="5">No documents in queue.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="summary-panel" class="surface panel panel-wide" aria-labelledby="summary-title">
+        <div class="panel-header">
+          <div>
+            <h3 id="summary-title" class="panel-title">Selected document summary</h3>
+            <p class="panel-copy">Document-level details for the currently selected item.</p>
+          </div>
+          <div class="status-pill" id="document-status-pill" aria-live="polite">No document selected</div>
+        </div>
+
+        <div class="summary-grid">
+          <article class="summary-card" aria-labelledby="document-file-title">
+            <h4 id="document-file-title" class="card-title">File details</h4>
+            <dl class="detail-list" id="document-summary-list">
+              <div>
+                <dt>Filename</dt>
+                <dd id="document-filename">-</dd>
+              </div>
+              <div>
+                <dt>Source</dt>
+                <dd id="document-source">-</dd>
+              </div>
+              <div>
+                <dt>Received</dt>
+                <dd id="document-received-at">-</dd>
+              </div>
+              <div>
+                <dt>Reviewer</dt>
+                <dd id="document-reviewer">-</dd>
+              </div>
+            </dl>
+          </article>
+
+          <article class="summary-card" aria-labelledby="document-notes-title">
+            <h4 id="document-notes-title" class="card-title">Processing notes</h4>
+            <p id="document-notes" class="notes-copy">Select a queued document to view extraction notes and review guidance.</p>
+          </article>
+        </div>
+      </section>
+
+      <section id="records-panel" class="surface panel panel-wide" aria-labelledby="records-title">
+        <div class="panel-header">
+          <div>
+            <h3 id="records-title" class="panel-title">Saved records</h3>
+            <p class="panel-copy">Previously reviewed and saved staff document records.</p>
+          </div>
+          <button id="refresh-records" class="tool-button" type="button">Refresh records</button>
+        </div>
+        <div class="table-frame" role="region" aria-labelledby="records-title" tabindex="0">
+          <table class="queue-table">
+            <caption class="sr-only">Saved staff document records</caption>
+            <thead>
+              <tr>
+                <th scope="col">Staff</th>
+                <th scope="col">Document</th>
+                <th scope="col">Number</th>
+                <th scope="col">Expiry</th>
+                <th scope="col">Notes</th>
+                <th scope="col">Confidence</th>
+                <th scope="col">Status</th>
+              </tr>
+            </thead>
+            <tbody id="records-table-body">
+              <tr>
+                <td colspan="7">No approved records saved yet.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <aside class="inspector" aria-label="Document inspector">
+      <section class="surface inspector-panel" aria-labelledby="fields-title">
+        <div class="panel-header">
+          <div>
+            <h2 id="fields-title" class="panel-title">Extracted fields</h2>
+            <p class="panel-copy">Review OCR output, confidence, and correction status.</p>
+          </div>
+          <div class="confidence-chip" id="overall-confidence">0%</div>
+        </div>
+
+        <dl class="field-list" id="extracted-fields-list">
+          <div class="field-row">
+            <dt>First name</dt>
+            <dd id="field-first-name" contenteditable="true" role="textbox" aria-label="First name">-</dd>
+          </div>
+          <div class="field-row">
+            <dt>Last name</dt>
+            <dd id="field-last-name" contenteditable="true" role="textbox" aria-label="Last name">-</dd>
+          </div>
+          <div class="field-row">
+            <dt>Document number</dt>
+            <dd id="field-id-number" contenteditable="true" role="textbox" aria-label="Document number">-</dd>
+          </div>
+          <div class="field-row">
+            <dt>Document type</dt>
+            <dd id="field-doc-type" contenteditable="true" role="textbox" aria-label="Document type">-</dd>
+          </div>
+          <div class="field-row">
+            <dt>Expiry date</dt>
+            <dd id="field-expiry-date" contenteditable="true" role="textbox" aria-label="Expiry date">-</dd>
+          </div>
+          <div class="field-row">
+            <dt>Phone number</dt>
+            <dd id="field-phone-number" contenteditable="true" role="textbox" aria-label="Phone number">-</dd>
+          </div>
+        </dl>
+        <ul id="validation-errors" class="validation-errors" aria-live="polite"></ul>
+      </section>
+
+      <section class="surface inspector-panel" aria-labelledby="review-title">
+        <div class="panel-header">
+          <div>
+            <h2 id="review-title" class="panel-title">Review actions</h2>
+            <p class="panel-copy">Approve, reject, or mark corrections before finalizing.</p>
+          </div>
+          <div class="status-badge" id="review-status">Waiting</div>
+        </div>
+
+        <div class="action-stack" role="group" aria-label="Document review actions">
+          <button id="approve-btn" class="action-button action-approve" type="button">Approve</button>
+          <button id="reject-btn" class="action-button action-reject" type="button">Reject</button>
+          <button id="correct-btn" class="action-button action-correct" type="button">Mark corrections</button>
+        </div>
+
+        <div class="correction-panel" aria-labelledby="corrections-title">
+          <h3 id="corrections-title" class="panel-subtitle">Correction entry</h3>
+          <label class="field-label" for="correction-notes">Notes</label>
+          <textarea id="correction-notes" class="correction-textarea" rows="5" placeholder="Enter reviewer notes or corrected values"></textarea>
+          <button id="save-corrections-btn" class="tool-button tool-button-primary" type="button">Save corrections</button>
+        </div>
+      </section>
+    </aside>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="renderer.js"></script>
+</body>
+</html>

@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>StaffPass Local OCR Hub - Architecture Graph</title>
+  <style>
+    :root {
+      --bg-color: #0f1115;
+      --panel-bg: rgba(22, 26, 33, 0.8);
+      --border-color: #30363d;
+      --text-color: #c9d1d9;
+      --text-muted: #8b949e;
+      --accent: #58a6ff;
+      --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      font-family: var(--font-family);
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+    }
+
+    #graph-container {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 1;
+    }
+
+    /* UI Panels - Glassmorphism */
+    .panel {
+      position: absolute;
+      background: var(--panel-bg);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 16px;
+      z-index: 10;
+      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+    }
+
+    #header {
+      top: 20px;
+      left: 20px;
+      max-width: 320px;
+    }
+
+    #header h1 {
+      margin: 0 0 6px 0;
+      font-size: 18px;
+      font-weight: 600;
+      color: #f0f6fc;
+      letter-spacing: -0.5px;
+    }
+
+    #header p {
+      margin: 0;
+      font-size: 12px;
+      color: var(--text-muted);
+      line-height: 1.4;
+    }
+
+    #info-panel {
+      bottom: 20px;
+      left: 20px;
+      width: 320px;
+      display: none;
+      transition: all 0.3s ease;
+    }
+
+    #info-panel h3 {
+      margin: 0 0 8px 0;
+      font-size: 16px;
+      color: #f0f6fc;
+    }
+
+    .meta-tag {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: bold;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+
+    .tag-ui { background: #238636; color: #aff5b4; }
+    .tag-process { background: #8957e5; color: #d8b2ff; }
+    .tag-db { background: #9e6a03; color: #ffe3b3; }
+    .tag-sidecar { background: #1f6feb; color: #c8e1ff; }
+
+    #info-desc {
+      font-size: 13px;
+      line-height: 1.5;
+      margin-bottom: 12px;
+    }
+
+    .info-list {
+      margin: 0;
+      padding-left: 18px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    #legend {
+      top: 20px;
+      right: 20px;
+      font-size: 12px;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .legend-color {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      margin-right: 8px;
+    }
+
+    /* SVG Nodes & Links styling */
+    .link {
+      stroke: #444c56;
+      stroke-opacity: 0.6;
+      stroke-width: 1.5px;
+      transition: stroke 0.2s, stroke-opacity 0.2s;
+    }
+
+    .node {
+      cursor: pointer;
+    }
+
+    .node circle {
+      stroke: #0f1115;
+      stroke-width: 2px;
+      transition: fill 0.3s, r 0.3s, stroke-width 0.3s;
+    }
+
+    .node text {
+      fill: #c9d1d9;
+      font-size: 11px;
+      pointer-events: none;
+      text-anchor: middle;
+      font-weight: 500;
+    }
+
+    /* Highlight effects */
+    .node:hover circle {
+      stroke: #ffffff;
+      stroke-width: 3px;
+    }
+
+    .node.active circle {
+      stroke: #ffffff;
+      stroke-width: 3px;
+      r: 16px;
+    }
+
+    .link.highlighted {
+      stroke: var(--accent);
+      stroke-opacity: 1;
+      stroke-width: 2.5px;
+    }
+
+    .link.dimmed {
+      stroke-opacity: 0.15;
+    }
+
+    .node.dimmed circle {
+      opacity: 0.3;
+    }
+
+    .node.dimmed text {
+      opacity: 0.3;
+    }
+
+    #reset-btn {
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+      background: var(--panel-bg);
+      border: 1px solid var(--border-color);
+      color: var(--text-color);
+      padding: 8px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+      z-index: 10;
+      transition: background 0.2s;
+    }
+
+    #reset-btn:hover {
+      background: #21262d;
+      color: #ffffff;
+    }
+  </style>
+  <!-- Load D3.js from CDN -->
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+</head>
+<body>
+
+  <div id="graph-container"></div>
+
+  <div class="panel" id="header">
+    <h1>StaffPass OCR Hub</h1>
+    <p>Architecture Dependency Map (Obsidian Style). Click nodes to view dependencies and details. Drag to reorganize.</p>
+  </div>
+
+  <div class="panel" id="legend">
+    <div class="legend-item">
+      <div class="legend-color" style="background: #238636;"></div>
+      <span>Frontend / UI (HTML/CSS/JS)</span>
+    </div>
+    <div class="legend-item">
+      <div class="legend-color" style="background: #8957e5;"></div>
+      <span>Main Process (Electron/Node)</span>
+    </div>
+    <div class="legend-item">
+      <div class="legend-color" style="background: #d29922;"></div>
+      <span>Database Layer (SQLite)</span>
+    </div>
+    <div class="legend-item">
+      <div class="legend-color" style="background: #1f6feb;"></div>
+      <span>Python Sidecar (OCR Engine)</span>
+    </div>
+  </div>
+
+  <div class="panel" id="info-panel">
+    <span class="meta-tag" id="info-tag">UI</span>
+    <h3 id="info-title">Node Title</h3>
+    <p id="info-desc">Description of the module.</p>
+    <div style="font-weight: 600; font-size: 11px; margin-bottom: 4px;">Dependencies:</div>
+    <ul class="info-list" id="info-deps"></ul>
+  </div>
+
+  <button id="reset-btn">Reset Layout</button>
+
+  <script>
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+
+    const data = {
+      nodes: [
+        // Electron Process
+        { id: "main.js", group: "process", label: "main.js", path: "./main.js", desc: "Electron main process. Coordinates application lifecycle, registers IPC channels, manages database lifecycle, and spawns the Python OCR sidecar process.", deps: ["electron", "database.js", "sidecar_bridge.js"] },
+        { id: "preload.js", group: "process", label: "preload.js", path: "./preload.js", desc: "Exposes secure IPC bridge API endpoints to the renderer process via contextBridge, ensuring strict isolation.", deps: ["electron"] },
+        { id: "sidecar_bridge.js", group: "process", label: "sidecar_bridge.js", path: "./sidecar_bridge.js", desc: "IPC manager that spawns, communicates with, and kills the Python OCR Sidecar subprocess over standard streams.", deps: ["child_process", "ocr_sidecar.py"] },
+        
+        // Frontend Group
+        { id: "index.html", group: "ui", label: "index.html", path: "./index.html", desc: "Main application viewport template. Structuring the document intake layout and manual review dashboard.", deps: ["renderer.js", "index.css"] },
+        { id: "index.css", group: "ui", label: "index.css", path: "./index.css", desc: "Premium styling stylesheet. Contains the HSL dark mode definitions, glassmorphism panel styles, and smooth interaction states.", deps: [] },
+        { id: "renderer.js", group: "ui", label: "renderer.js", path: "./renderer.js", desc: "Renderer process bundle. Orchestrates frontend events, updates state, and makes calls to the main process via exposed window.api.", deps: ["preload.js"] },
+
+        // Database Group
+        { id: "database.js", group: "db", label: "database.js", path: "./database.js", desc: "SQLite interface abstraction. Initialises database structure, performs deduplication logic, stores metadata, and appends to audit logs.", deps: ["better-sqlite3", "staffpass.db"] },
+        { id: "staffpass.db", group: "db", label: "staffpass.db", path: "./staffpass.db", desc: "Local SQLite database file storing persistent staff records, processed documents tables, and system logs.", deps: [] },
+
+        // Python Sidecar
+        { id: "ocr_sidecar.py", group: "sidecar", label: "ocr_sidecar.py", path: "./sidecar/ocr_sidecar.py", desc: "Python entry script. Reads JSON-structured instructions from standard input, dispatches VLM processing, and prints JSON results to standard output.", deps: ["mock_adapter.py", "base_adapter.py"] },
+        { id: "base_adapter.py", group: "sidecar", label: "base_adapter.py", path: "./sidecar/base_adapter.py", desc: "VLM model adapter abstract class. Implements standard interface methods: load(), extract_metadata(), unload().", deps: [] },
+        { id: "mock_adapter.py", group: "sidecar", label: "mock_adapter.py", path: "./sidecar/mock_adapter.py", desc: "Mock model implementation of BaseVLMAdapter. Simulates VLM execution times and returns high-accuracy test extractions.", deps: ["base_adapter.py"] }
+      ],
+      links: [
+        { source: "main.js", target: "sidecar_bridge.js" },
+        { source: "main.js", target: "database.js" },
+        { source: "main.js", target: "preload.js" },
+        { source: "main.js", target: "index.html" },
+        
+        { source: "preload.js", target: "renderer.js" },
+        
+        { source: "index.html", target: "index.css" },
+        { source: "index.html", target: "renderer.js" },
+        
+        { source: "sidecar_bridge.js", target: "ocr_sidecar.py" },
+        
+        { source: "database.js", target: "staffpass.db" },
+        
+        { source: "ocr_sidecar.py", target: "mock_adapter.py" },
+        { source: "ocr_sidecar.py", target: "base_adapter.py" },
+        { source: "mock_adapter.py", target: "base_adapter.py" }
+      ]
+    };
+
+    const colors = {
+      ui: "#238636",
+      process: "#8957e5",
+      db: "#d29922",
+      sidecar: "#1f6feb"
+    };
+
+    const svg = d3.select("#graph-container")
+      .append("svg")
+      .attr("width", "100%")
+      .attr("height", "100%");
+
+    const g = svg.append("g");
+
+    // Add zoom capabilities
+    const zoom = d3.zoom()
+      .scaleExtent([0.3, 3])
+      .on("zoom", (event) => {
+        g.attr("transform", event.transform);
+      });
+    svg.call(zoom);
+
+    // Initial simulation
+    const simulation = d3.forceSimulation(data.nodes)
+      .force("link", d3.forceLink(data.links).id(d => d.id).distance(140))
+      .force("charge", d3.forceManyBody().strength(-400))
+      .force("center", d3.forceCenter(width / 2, height / 2))
+      .force("collision", d3.forceCollide().radius(60));
+
+    // Render links
+    const link = g.append("g")
+      .attr("class", "links")
+      .selectAll("line")
+      .data(data.links)
+      .enter().append("line")
+      .attr("class", "link");
+
+    // Render nodes
+    const node = g.append("g")
+      .attr("class", "nodes")
+      .selectAll("g")
+      .data(data.nodes)
+      .enter().append("g")
+      .attr("class", "node")
+      .on("click", handleNodeClick)
+      .call(d3.drag()
+        .on("start", dragstarted)
+        .on("drag", dragged)
+        .on("end", dragended));
+
+    node.append("circle")
+      .attr("r", 12)
+      .attr("fill", d => colors[d.group]);
+
+    node.append("text")
+      .attr("y", 25)
+      .text(d => d.label);
+
+    simulation.on("tick", () => {
+      link
+        .attr("x1", d => d.source.x)
+        .attr("y1", d => d.source.y)
+        .attr("x2", d => d.target.x)
+        .attr("y2", d => d.target.y);
+
+      node
+        .attr("transform", d => `translate(${d.x},${d.y})`);
+    });
+
+    // Reset zoom and simulation positions
+    d3.select("#reset-btn").on("click", () => {
+      svg.transition().duration(750).call(
+        zoom.transform,
+        d3.zoomIdentity
+      );
+      data.nodes.forEach(d => {
+        d.fx = null;
+        d.fy = null;
+      });
+      simulation.alpha(1).restart();
+    });
+
+    // Node Interaction Details
+    function handleNodeClick(event, d) {
+      event.stopPropagation();
+      
+      // Toggle active states
+      node.classed("active", n => n.id === d.id);
+      node.classed("dimmed", n => {
+        if (n.id === d.id) return false;
+        // Keep connected nodes bright
+        return !data.links.some(l => 
+          (l.source.id === d.id && l.target.id === n.id) ||
+          (l.target.id === d.id && l.source.id === n.id)
+        );
+      });
+
+      link.classed("highlighted", l => l.source.id === d.id || l.target.id === d.id);
+      link.classed("dimmed", l => l.source.id !== d.id && l.target.id !== d.id);
+
+      // Populate info panel
+      const infoPanel = document.getElementById("info-panel");
+      const infoTag = document.getElementById("info-tag");
+      infoTag.className = "meta-tag tag-" + d.group;
+      infoTag.innerText = d.group;
+      
+      document.getElementById("info-title").innerText = d.label + ` (${d.path})`;
+      document.getElementById("info-desc").innerText = d.desc;
+      
+      const depsList = document.getElementById("info-deps");
+      depsList.innerHTML = "";
+      d.deps.forEach(dep => {
+        const li = document.createElement("li");
+        li.innerText = dep;
+        depsList.appendChild(li);
+      });
+
+      infoPanel.style.display = "block";
+    }
+
+    // Click outside to deselect
+    svg.on("click", () => {
+      node.classed("active", false);
+      node.classed("dimmed", false);
+      link.classed("highlighted", false);
+      link.classed("dimmed", false);
+      document.getElementById("info-panel").style.display = "none";
+    });
+
+    // Drag helpers
+    function dragstarted(event, d) {
+      if (!event.active) simulation.alphaTarget(0.3).restart();
+      d.fx = d.x;
+      d.fy = d.y;
+    }
+
+    function dragged(event, d) {
+      d.fx = event.x;
+      d.fy = event.y;
+    }
+
+    function dragended(event, d) {
+      if (!event.active) simulation.alphaTarget(0);
+      // Let nodes settle where dragged (un-fix them on demand)
+    }
+  </script>
+</body>
+</html>

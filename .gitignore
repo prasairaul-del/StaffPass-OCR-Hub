@@ -1,0 +1,7 @@
+node_modules/
+package-lock.json
+app-output.txt
+nul
+sidecar/__pycache__/
+sidecar/tests/__pycache__/
+*.pyc
