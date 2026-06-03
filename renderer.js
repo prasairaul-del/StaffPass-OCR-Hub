@@ -507,6 +507,22 @@ async function init() {
         setActiveView(view);
         render();
         showToast(view === 'review' ? 'Review Queue' : view[0].toUpperCase() + view.slice(1));
+        return;
+      }
+      if (event.key === 'e' || event.key === 'E') {
+        event.preventDefault();
+        query('export-records-btn')?.click();
+        return;
+      }
+      if (event.key === 'n' || event.key === 'N') {
+        event.preventDefault();
+        processSelectedOCR();
+        return;
+      }
+      if (event.key === 'o' || event.key === 'O') {
+        event.preventDefault();
+        selectDocuments();
+        return;
       }
     }
   });

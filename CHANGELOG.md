@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **Dark mode** — Full dark theme with CSS custom properties, toggle switch in the sidebar, and `localStorage` persistence so the preference survives restarts.
-- **Keyboard shortcuts** — `Ctrl+Shift+D` toggles dark mode; `Ctrl+1`/`Ctrl+2`/`Ctrl+3` switch between Ingestion, Review Queue, and Records tabs; `Ctrl+/` opens a keyboard shortcut help overlay; `Escape` closes it.
+- **Keyboard shortcuts** — `Ctrl+Shift+D` toggles dark mode; `Ctrl+1`/`Ctrl+2`/`Ctrl+3` switch between Ingestion, Review Queue, and Records tabs; `Ctrl+O` opens the file picker; `Ctrl+N` runs OCR on the selected document; `Ctrl+E` exports records; `Ctrl+/` opens a keyboard shortcut help overlay; `Escape` closes it.
 - **Toast notifications** — Brief slide-up toast confirms theme changes and tab switches.
 - **CSS-only tooltips** — Hovering sidebar tab buttons shows descriptive tooltips with shortcut hints (e.g. "Ctrl+1") and no JavaScript required.
 - **Keyboard shortcut help overlay** — Modal dialog listing all available shortcuts with `<kbd>` styled keys, backdrop click dismiss, and full keyboard accessibility (focus management, Escape to close).
