@@ -5,3 +5,5 @@ nul
 sidecar/__pycache__/
 sidecar/tests/__pycache__/
 *.pyc
+dist_installer/
+

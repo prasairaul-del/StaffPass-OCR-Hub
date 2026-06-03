@@ -27,7 +27,7 @@ describe('Electron app wiring', () => {
   it('keeps the package configuration pointed at main.js', () => {
     const pkg = require('../package.json');
     assert.strictEqual(pkg.main, 'main.js');
-    assert.ok(pkg.dependencies.electron);
+    assert.ok(pkg.devDependencies.electron);
   });
 
   it('registers the planned IPC handlers and secure window wiring', async () => {
