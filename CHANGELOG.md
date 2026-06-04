@@ -40,3 +40,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Git repository** — Initialized with a clean `.gitignore` and two commits.
 - **Tag** — `v1.0.0` annotated tag pointing to the initial release.
 - **Dependencies** — `husky` (^9.1.7) added as a dev dependency with `"prepare": "husky"` script.
+- **Electron-builder packaging** — Configured `electron-builder` for Windows NSIS installer generation. Package config includes: `appId`, product name, custom install directory option, Start Menu and Desktop shortcuts, and proper bundling of `better-sqlite3` native module via `install-app-deps`.
+- **Windows NSIS installer** — `npm run dist` produces a full Windows installer (`StaffPass OCR Hub Setup 1.0.0.exe`) with one-click or custom install modes, uninstaller, and optional install directory selection.
+- **Custom app icon** — Multi-size `.ico` (16–256px) blue rounded-rectangle icon with "OCR" text, used for the desktop shortcut, installer, and embedded into the packaged `.exe` via `signAndEditExecutable`.
+- **Desktop shortcut** — Auto-created by the NSIS installer with the custom icon. Manual `.lnk` shortcut also available in the project for development use.
+- **Developer Mode dependency** — Windows Developer Mode must be enabled for `electron-builder` to extract `winCodeSign` (contains macOS `.dylib` symlinks). Without it, `signAndEditExecutable` is skipped and the `.exe` uses the default Electron icon.
