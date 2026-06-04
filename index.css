@@ -939,6 +939,85 @@ kbd {
   background: var(--accent);
 }
 
+/* What's new dialog */
+.whats-new-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 250;
+}
+
+.whats-new-overlay[aria-hidden="true"] {
+  display: none;
+}
+
+.whats-new-modal {
+  position: relative;
+  width: 480px;
+  max-width: 92vw;
+  max-height: 80vh;
+  padding: 20px 24px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+  animation: shortcuts-enter 0.2s ease;
+  display: flex;
+  flex-direction: column;
+}
+
+.whats-new-version {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--success-soft);
+  color: var(--success-color);
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin-bottom: 14px;
+  align-self: flex-start;
+}
+
+.whats-new-body {
+  flex: 1;
+  overflow-y: auto;
+  font-size: 0.92rem;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.whats-new-body h3 {
+  margin: 14px 0 6px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.whats-new-body h3:first-child {
+  margin-top: 0;
+}
+
+.whats-new-body ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.whats-new-body li {
+  margin-bottom: 6px;
+}
+
+.whats-new-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 16px;
+  margin-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
 @media (max-width: 1280px) {
   .app-shell {
     grid-template-columns: 220px minmax(0, 1fr);

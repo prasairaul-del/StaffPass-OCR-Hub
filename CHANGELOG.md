@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **Publish provider** — Switched auto-updater from generic URL to GitHub Releases (`prasairaul-del/StaffPass-OCR-Hub`), enabling automatic update distribution through GitHub.
+- **Version display** — App version shown in the sidebar brand area (e.g. "v1.1.0").
+- **What's new dialog** — Automatically shows release notes on first launch after an update. Compares stored version in localStorage against the current app version and displays a modal with version-specific changes. Dismissable via button, backdrop click, or Escape.
 
 ## [1.0.0] - 2026-06-03
 

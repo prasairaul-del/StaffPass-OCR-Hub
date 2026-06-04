@@ -472,6 +472,136 @@ function loadSavedTheme() {
   return 'light';
 }
 
+const releaseNotes = {
+  '1.1.0': {
+    title: "What's new in v1.1.0",
+    sections: [
+      {
+        heading: 'Auto-updater',
+        items: [
+          'Automatic update checks on app startup',
+          'Background download of new versions from GitHub Releases',
+          'Update notification banner with one-click install'
+        ]
+      },
+      {
+        heading: 'Manual update check',
+        items: [
+          '"Check for updates" button in the sidebar',
+          'Ctrl+U keyboard shortcut'
+        ]
+      },
+      {
+        heading: 'Installer improvements',
+        items: [
+          'Custom app icon embedded in the .exe',
+          'Windows NSIS installer with Start Menu and Desktop shortcuts',
+          'Version display (v1.1.0) shown in the sidebar'
+        ]
+      }
+    ]
+  },
+  '1.0.0': {
+    title: "Welcome to StaffPass OCR Hub",
+    sections: [
+      {
+        heading: 'Core features',
+        items: [
+          'Document intake with drag-and-drop and file picker',
+          'AI-powered OCR processing of staff ID and pass documents',
+          'Review queue for inspecting and correcting extracted metadata',
+          'Approved records table with search and export'
+        ]
+      },
+      {
+        heading: 'UI & UX',
+        items: [
+          'Dark mode with localStorage persistence',
+          'Keyboard shortcuts (Ctrl+1/2/3, Ctrl+O, Ctrl+N, Ctrl+E)',
+          'Smooth CSS transitions and toast notifications'
+        ]
+      }
+    ]
+  }
+};
+
+function compareVersions(a, b) {
+  const pa = a.split('.').map(Number);
+  const pb = b.split('.').map(Number);
+  for (let i = 0; i < 3; i++) {
+    if ((pa[i] || 0) > (pb[i] || 0)) return 1;
+    if ((pa[i] || 0) < (pb[i] || 0)) return -1;
+  }
+  return 0;
+}
+
+function getReleaseNotes(version) {
+  return releaseNotes[version] || {
+    title: `What's new in v${version}`,
+    sections: [
+      { heading: 'Changes', items: ['Bug fixes and improvements.'] }
+    ]
+  };
+}
+
+function showWhatsNewDialog(version) {
+  const overlay = query('whats-new-overlay');
+  if (!overlay) return;
+
+  const notes = getReleaseNotes(version);
+  text('whats-new-version', `v${version}`);
+
+  const body = query('whats-new-body');
+  if (body) {
+    body.innerHTML = '';
+    notes.sections.forEach((section) => {
+      const heading = document.createElement('h3');
+      heading.textContent = section.heading;
+      body.appendChild(heading);
+      const list = document.createElement('ul');
+      section.items.forEach((item) => {
+        const li = document.createElement('li');
+        li.textContent = item;
+        list.appendChild(li);
+      });
+      body.appendChild(list);
+    });
+  }
+
+  overlay.setAttribute('aria-hidden', 'false');
+  previouslyFocusedElement = document.activeElement;
+  query('whats-new-close')?.focus();
+}
+
+function dismissWhatsNew() {
+  const overlay = query('whats-new-overlay');
+  if (!overlay) return;
+  overlay.setAttribute('aria-hidden', 'true');
+  if (previouslyFocusedElement && previouslyFocusedElement.focus) {
+    previouslyFocusedElement.focus();
+  }
+}
+
+function saveSeenVersion(version) {
+  try { localStorage.setItem('staffpass-last-seen-version', version); } catch (_err) { /* ignore */ }
+}
+
+function getSeenVersion() {
+  try { return localStorage.getItem('staffpass-last-seen-version'); } catch (_err) { return null; }
+}
+
+async function checkAndShowWhatsNew() {
+  if (!window.api || !window.api.getVersion) return;
+  try {
+    const version = await window.api.getVersion();
+    const seen = getSeenVersion();
+    if (!seen || compareVersions(version, seen) > 0) {
+      showWhatsNewDialog(version);
+    }
+    saveSeenVersion(version);
+  } catch (_err) { /* ignore */ }
+}
+
 function checkForUpdates() {
   if (!window.api || !window.api.checkForUpdates) return;
   window.api.checkForUpdates();
@@ -554,8 +684,14 @@ async function init() {
   applyTheme(loadSavedTheme());
   setupAutoUpdateUI();
   loadVersion();
+  checkAndShowWhatsNew();
   query('theme-toggle')?.addEventListener('click', toggleTheme);
   query('shortcuts-close')?.addEventListener('click', toggleShortcutsOverlay);
+  query('whats-new-close')?.addEventListener('click', dismissWhatsNew);
+  query('whats-new-dismiss')?.addEventListener('click', dismissWhatsNew);
+  query('whats-new-overlay')?.addEventListener('click', (event) => {
+    if (event.target.classList.contains('shortcuts-backdrop')) dismissWhatsNew();
+  });
   query('shortcuts-overlay')?.addEventListener('click', (event) => {
     if (event.target.classList.contains('shortcuts-backdrop')) toggleShortcutsOverlay();
   });
@@ -572,8 +708,12 @@ async function init() {
       return;
     }
     if (event.key === 'Escape') {
-      const overlay = query('shortcuts-overlay');
-      if (overlay && overlay.getAttribute('aria-hidden') === 'false') {
+      const whatsNewOverlay = query('whats-new-overlay');
+      const shortcutsOverlay = query('shortcuts-overlay');
+      if (whatsNewOverlay && whatsNewOverlay.getAttribute('aria-hidden') === 'false') {
+        event.preventDefault();
+        dismissWhatsNew();
+      } else if (shortcutsOverlay && shortcutsOverlay.getAttribute('aria-hidden') === 'false') {
         event.preventDefault();
         toggleShortcutsOverlay();
       }
