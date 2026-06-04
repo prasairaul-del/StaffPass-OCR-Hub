@@ -51,6 +51,10 @@ function registerIpcHandlers() {
     return db.listRecords();
   });
 
+  ipcMain.handle('app:getVersion', () => {
+    return app.getVersion();
+  });
+
   ipcMain.on('updater:check', () => {
     autoUpdater.checkForUpdates().catch(() => {});
   });

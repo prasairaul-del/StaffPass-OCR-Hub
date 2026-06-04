@@ -542,9 +542,18 @@ function showUpdateReadyBanner(version) {
   banner.appendChild(dismissBtn);
 }
 
+async function loadVersion() {
+  if (!window.api || !window.api.getVersion) return;
+  try {
+    const version = await window.api.getVersion();
+    text('app-version', `v${version}`);
+  } catch (_err) { /* ignore */ }
+}
+
 async function init() {
   applyTheme(loadSavedTheme());
   setupAutoUpdateUI();
+  loadVersion();
   query('theme-toggle')?.addEventListener('click', toggleTheme);
   query('shortcuts-close')?.addEventListener('click', toggleShortcutsOverlay);
   query('shortcuts-overlay')?.addEventListener('click', (event) => {

@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld('api', {
   processOCR: (filePath) => ipcRenderer.invoke('ocr:process', filePath),
   saveReview: (payload) => ipcRenderer.invoke('review:save', payload),
   listRecords: () => ipcRenderer.invoke('records:list'),
+  getVersion: () => ipcRenderer.invoke('app:getVersion'),
 
   // Auto-updater APIs
   checkForUpdates: () => ipcRenderer.send('updater:check'),
