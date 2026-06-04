@@ -472,6 +472,11 @@ function loadSavedTheme() {
   return 'light';
 }
 
+function checkForUpdates() {
+  if (!window.api || !window.api.checkForUpdates) return;
+  window.api.checkForUpdates();
+}
+
 function setupAutoUpdateUI() {
   if (!window.api || !window.api.onUpdateStatus) return;
 
@@ -590,8 +595,14 @@ async function init() {
         selectDocuments();
         return;
       }
+      if (event.key === 'u' || event.key === 'U') {
+        event.preventDefault();
+        checkForUpdates();
+        return;
+      }
     }
   });
+  query('check-updates-btn')?.addEventListener('click', checkForUpdates);
   bindEvents();
   setActiveView('ingestion');
   await loadRecords();

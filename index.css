@@ -405,6 +405,11 @@ textarea:focus-visible,
   border-color: var(--accent);
 }
 
+.rail-update-btn {
+  width: 100%;
+  margin-bottom: 14px;
+}
+
 .tool-button-primary {
   border-color: var(--accent);
   background: var(--accent);
