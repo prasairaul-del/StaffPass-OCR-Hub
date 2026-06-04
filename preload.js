@@ -14,6 +14,7 @@ contextBridge.exposeInMainWorld('api', {
   saveReview: (payload) => ipcRenderer.invoke('review:save', payload),
   listRecords: () => ipcRenderer.invoke('records:list'),
   getVersion: () => ipcRenderer.invoke('app:getVersion'),
+  fetchReleaseNotes: (version) => ipcRenderer.invoke('release-notes:get', version),
 
   // Auto-updater APIs
   checkForUpdates: () => ipcRenderer.send('updater:check'),

@@ -472,100 +472,77 @@ function loadSavedTheme() {
   return 'light';
 }
 
-const releaseNotes = {
-  '1.1.0': {
-    title: "What's new in v1.1.0",
-    sections: [
-      {
-        heading: 'Auto-updater',
-        items: [
-          'Automatic update checks on app startup',
-          'Background download of new versions from GitHub Releases',
-          'Update notification banner with one-click install'
-        ]
-      },
-      {
-        heading: 'Manual update check',
-        items: [
-          '"Check for updates" button in the sidebar',
-          'Ctrl+U keyboard shortcut'
-        ]
-      },
-      {
-        heading: 'Installer improvements',
-        items: [
-          'Custom app icon embedded in the .exe',
-          'Windows NSIS installer with Start Menu and Desktop shortcuts',
-          'Version display (v1.1.0) shown in the sidebar'
-        ]
-      }
-    ]
-  },
-  '1.0.0': {
-    title: "Welcome to StaffPass OCR Hub",
-    sections: [
-      {
-        heading: 'Core features',
-        items: [
-          'Document intake with drag-and-drop and file picker',
-          'AI-powered OCR processing of staff ID and pass documents',
-          'Review queue for inspecting and correcting extracted metadata',
-          'Approved records table with search and export'
-        ]
-      },
-      {
-        heading: 'UI & UX',
-        items: [
-          'Dark mode with localStorage persistence',
-          'Keyboard shortcuts (Ctrl+1/2/3, Ctrl+O, Ctrl+N, Ctrl+E)',
-          'Smooth CSS transitions and toast notifications'
-        ]
-      }
-    ]
-  }
-};
+function parseReleaseNotes(markdown) {
+  if (!markdown) return null;
+  const sections = [];
+  let currentSection = null;
 
-function compareVersions(a, b) {
-  const pa = a.split('.').map(Number);
-  const pb = b.split('.').map(Number);
-  for (let i = 0; i < 3; i++) {
-    if ((pa[i] || 0) > (pb[i] || 0)) return 1;
-    if ((pa[i] || 0) < (pb[i] || 0)) return -1;
+  markdown.split('\n').forEach((line) => {
+    const trimmed = line.trim();
+    if (trimmed.startsWith('### ')) {
+      currentSection = { heading: trimmed.slice(4).trim(), items: [] };
+      sections.push(currentSection);
+    } else if (trimmed.startsWith('- ') && currentSection) {
+      currentSection.items.push(trimmed.slice(2).trim());
+    } else if (trimmed.startsWith('* ') && currentSection) {
+      currentSection.items.push(trimmed.slice(2).trim());
+    }
+  });
+
+  if (sections.length === 0 && markdown.trim()) {
+    sections.push({ heading: 'Changes', items: markdown.trim().split('\n').filter(Boolean) });
   }
-  return 0;
+
+  return sections.length > 0 ? sections : null;
 }
 
-function getReleaseNotes(version) {
-  return releaseNotes[version] || {
-    title: `What's new in v${version}`,
-    sections: [
-      { heading: 'Changes', items: ['Bug fixes and improvements.'] }
-    ]
-  };
+async function fetchReleaseNotes(version) {
+  // Check cache first to avoid GitHub API rate limits
+  try {
+    const cached = localStorage.getItem(`staffpass-release-notes-${version}`);
+    if (cached) return JSON.parse(cached);
+  } catch (_err) { /* ignore */ }
+
+  if (!window.api || !window.api.fetchReleaseNotes) return null;
+  try {
+    const result = await window.api.fetchReleaseNotes(version);
+    const sections = parseReleaseNotes(result.body);
+    if (sections) {
+      try { localStorage.setItem(`staffpass-release-notes-${version}`, JSON.stringify(sections)); } catch (_err) { /* ignore */ }
+    }
+    return sections;
+  } catch (_err) {
+    return null;
+  }
 }
 
-function showWhatsNewDialog(version) {
+function showWhatsNewDialog(version, sections) {
   const overlay = query('whats-new-overlay');
   if (!overlay) return;
 
-  const notes = getReleaseNotes(version);
   text('whats-new-version', `v${version}`);
 
   const body = query('whats-new-body');
   if (body) {
     body.innerHTML = '';
-    notes.sections.forEach((section) => {
-      const heading = document.createElement('h3');
-      heading.textContent = section.heading;
-      body.appendChild(heading);
-      const list = document.createElement('ul');
-      section.items.forEach((item) => {
-        const li = document.createElement('li');
-        li.textContent = item;
-        list.appendChild(li);
+    if (sections && sections.length > 0) {
+      sections.forEach((section) => {
+        const heading = document.createElement('h3');
+        heading.textContent = section.heading;
+        body.appendChild(heading);
+        const list = document.createElement('ul');
+        section.items.forEach((item) => {
+          const li = document.createElement('li');
+          li.textContent = item;
+          list.appendChild(li);
+        });
+        body.appendChild(list);
       });
-      body.appendChild(list);
-    });
+    } else {
+      const p = document.createElement('p');
+      p.textContent = 'Bug fixes and improvements.';
+      body.appendChild(p);
+    }
   }
 
   overlay.setAttribute('aria-hidden', 'false');
@@ -596,7 +573,8 @@ async function checkAndShowWhatsNew() {
     const version = await window.api.getVersion();
     const seen = getSeenVersion();
     if (!seen || compareVersions(version, seen) > 0) {
-      showWhatsNewDialog(version);
+      const sections = await fetchReleaseNotes(version);
+      showWhatsNewDialog(version, sections);
     }
     saveSeenVersion(version);
   } catch (_err) { /* ignore */ }

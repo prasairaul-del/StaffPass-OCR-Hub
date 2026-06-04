@@ -1,5 +1,6 @@
 const { app, BrowserWindow, dialog, ipcMain } = require('electron');
 const path = require('path');
+const https = require('https');
 const { autoUpdater } = require('electron-updater');
 const bridge = require('./sidecar_bridge');
 const db = require('./database');
@@ -53,6 +54,28 @@ function registerIpcHandlers() {
 
   ipcMain.handle('app:getVersion', () => {
     return app.getVersion();
+  });
+
+  ipcMain.handle('release-notes:get', async (event, version) => {
+    const owner = 'prasairaul-del';
+    const repo = 'StaffPass-OCR-Hub';
+    const url = `https://api.github.com/repos/${owner}/${repo}/releases/tags/v${version}`;
+    return new Promise((resolve) => {
+      https.get(url, { headers: { 'User-Agent': 'StaffPass-OCR-Hub' } }, (res) => {
+        let data = '';
+        res.on('data', (chunk) => { data += chunk; });
+        res.on('end', () => {
+          try {
+            const release = JSON.parse(data);
+            resolve({ body: release.body || '', name: release.name || '' });
+          } catch (_err) {
+            resolve({ body: '', name: '' });
+          }
+        });
+      }).on('error', () => {
+        resolve({ body: '', name: '' });
+      });
+    });
   });
 
   ipcMain.on('updater:check', () => {

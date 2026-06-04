@@ -108,7 +108,7 @@ describe('Electron app wiring', () => {
 
     assert.deepStrictEqual(
       Object.keys(registeredHandlers).sort(),
-      ['app:getVersion', 'documents:select', 'ocr:process', 'records:list', 'review:save']
+      ['app:getVersion', 'documents:select', 'ocr:process', 'records:list', 'release-notes:get', 'review:save']
     );
 
     const selectedFiles = await registeredHandlers['documents:select']();
@@ -157,7 +157,7 @@ describe('Electron app wiring', () => {
     assert.ok(exposed.api);
     assert.deepStrictEqual(
       Object.keys(exposed.api).sort(),
-      ['checkForUpdates', 'getVersion', 'installUpdate', 'listRecords', 'onUpdateStatus', 'processOCR', 'saveReview', 'selectDocuments']
+      ['checkForUpdates', 'fetchReleaseNotes', 'getVersion', 'installUpdate', 'listRecords', 'onUpdateStatus', 'processOCR', 'saveReview', 'selectDocuments']
     );
 
     await exposed.api.selectDocuments();
