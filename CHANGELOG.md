@@ -7,19 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.1.0] - 2026-06-04
 
-### Added
+### Changed
 
-- **Auto-updater** — Integrated `electron-updater` with GitHub Releases as the publish provider. Checks for updates 3 seconds after startup, downloads silently in the background, and shows a banner notification when an update is ready to install.
-- **Update notification banner** — Slides down from the top of the window when a new version is downloaded. Includes a "Restart & Install" button and a dismiss control. Styled for both light and dark themes.
-- **Manual update check** — "Check for updates" button in the sidebar and `Ctrl+U` keyboard shortcut to trigger a manual update check at any time.
-- **Windows NSIS installer** — `npm run dist` produces a full Windows installer with custom icon embedded in the `.exe` via `signAndEditExecutable`.
-- **Custom app icon** — Multi-size `.ico` (16–256px) blue rounded-rectangle icon with "OCR" text.
-- **Desktop shortcut** — Auto-created by the NSIS installer with the custom icon.
-
-### Infrastructure
-
-- **Electron-builder packaging** — Configured for Windows NSIS installer generation with `publish` pointing to GitHub Releases (`prasairaul-del/StaffPass-OCR-Hub`).
-- **GitHub repository** — Project published to `https://github.com/prasairaul-del/StaffPass-OCR-Hub`.
+- **Publish provider** — Switched auto-updater from generic URL to GitHub Releases (`prasairaul-del/StaffPass-OCR-Hub`), enabling automatic update distribution through GitHub.
 
 ## [1.0.0] - 2026-06-03
 
