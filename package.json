@@ -1,6 +1,6 @@
 {
   "name": "staffpass-ocr-hub",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "author": "StaffPass",
   "description": "StaffPass Local OCR Hub — process staff ID and pass documents with AI-powered OCR",
   "main": "main.js",
@@ -63,9 +63,9 @@
       "signAndEditExecutable": true
     },
     "publish": {
-      "provider": "generic",
-      "url": "https://example.com/updates/",
-      "channel": "latest"
+      "provider": "github",
+      "owner": "prasairaul-del",
+      "repo": "StaffPass-OCR-Hub"
     },
     "nsis": {
       "oneClick": false,
