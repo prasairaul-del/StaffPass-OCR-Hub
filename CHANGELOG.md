@@ -5,6 +5,16 @@ All notable changes to StaffPass OCR Hub will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-06-05
+
+### Added
+- **GLM-OCR Local CPU Adapter** — Added a CPU-optimized adapter (`glmocr_adapter.py`) to run multimodal document recognition without requiring a GPU or an external Ollama installation.
+- **On-Demand Memory Management** — The model is loaded into RAM/VRAM only during OCR extraction and immediately garbage-collected and unloaded when idle.
+- **Node 26 Compatibility** — Added a custom, lightweight test runner (`tests/run.js`) and explicit `"type": "commonjs"` configuration in `package.json` to prevent ESM module resolution and yargs/mocha compatibility errors.
+
+### Fixed
+- **Process Leakage Prevention** — Enforced a strict background process lifecycle; the Electron main process kills the Python sidecar process tree using `SIGKILL` on exit to guarantee no orphaned background tasks.
+
 ## [1.2.0] - 2026-06-04
 
 ### Changed

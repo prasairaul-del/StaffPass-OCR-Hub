@@ -119,9 +119,11 @@ function stop() {
 
   py.stdin.write(`${JSON.stringify({ action: 'exit' })}\n`);
   setTimeout(() => {
-    if (!py.killed) {
-      py.kill();
-    }
+    try {
+      if (py.exitCode === null) {
+        py.kill('SIGKILL');
+      }
+    } catch (_err) {}
   }, 500).unref();
 }
 

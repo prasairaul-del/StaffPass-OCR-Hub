@@ -1,13 +1,14 @@
 {
   "name": "staffpass-ocr-hub",
-  "version": "1.2.0",
+  "version": "1.3.0",
+  "type": "commonjs",
   "author": "StaffPass",
   "license": "MIT",
   "description": "StaffPass Local OCR Hub — process staff ID and pass documents with AI-powered OCR",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "test": "mocha tests/**/*.test.js",
+    "test": "node tests/run.js",
     "prepare": "husky",
     "rebuild": "electron-builder install-app-deps",
     "dist": "npm run rebuild && electron-builder --win",
