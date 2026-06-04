@@ -1,7 +1,21 @@
 const { contextBridge, ipcRenderer } = require('electron');
+
+function createSafeListener(channel, callback) {
+  const subscription = (_event, ...args) => callback(...args);
+  ipcRenderer.on(channel, subscription);
+  return () => {
+    ipcRenderer.removeListener(channel, subscription);
+  };
+}
+
 contextBridge.exposeInMainWorld('api', {
   selectDocuments: () => ipcRenderer.invoke('documents:select'),
   processOCR: (filePath) => ipcRenderer.invoke('ocr:process', filePath),
   saveReview: (payload) => ipcRenderer.invoke('review:save', payload),
-  listRecords: () => ipcRenderer.invoke('records:list')
+  listRecords: () => ipcRenderer.invoke('records:list'),
+
+  // Auto-updater APIs
+  checkForUpdates: () => ipcRenderer.send('updater:check'),
+  installUpdate: () => ipcRenderer.send('updater:install'),
+  onUpdateStatus: (callback) => createSafeListener('updater:status', callback)
 });

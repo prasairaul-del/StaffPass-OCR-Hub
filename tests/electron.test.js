@@ -61,7 +61,17 @@ describe('Electron app wiring', () => {
         ipcMain: {
           handle: (channel, handler) => {
             registeredHandlers[channel] = handler;
-          }
+          },
+          on: () => {}
+        }
+      },
+      'electron-updater': {
+        autoUpdater: {
+          autoDownload: false,
+          autoInstallOnAppQuit: false,
+          on: () => {},
+          checkForUpdates: async () => null,
+          quitAndInstall: () => {}
         }
       },
       './database': {
@@ -147,7 +157,7 @@ describe('Electron app wiring', () => {
     assert.ok(exposed.api);
     assert.deepStrictEqual(
       Object.keys(exposed.api).sort(),
-      ['listRecords', 'processOCR', 'saveReview', 'selectDocuments']
+      ['checkForUpdates', 'installUpdate', 'listRecords', 'onUpdateStatus', 'processOCR', 'saveReview', 'selectDocuments']
     );
 
     await exposed.api.selectDocuments();

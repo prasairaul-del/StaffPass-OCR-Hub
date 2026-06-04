@@ -13,7 +13,8 @@
     "dist:dir": "npm run rebuild && electron-builder --win --dir"
   },
   "dependencies": {
-    "better-sqlite3": "^12.10.0"
+    "better-sqlite3": "^12.10.0",
+    "electron-updater": "^6.8.3"
   },
   "devDependencies": {
     "electron": "^30.0.0",
@@ -48,15 +49,23 @@
           "!*.pyc"
         ]
       }
-    ],    "win": {
+    ],
+    "win": {
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "icon": "icon.ico",
       "signAndEditExecutable": true
+    },
+    "publish": {
+      "provider": "generic",
+      "url": "https://example.com/updates/",
+      "channel": "latest"
     },
     "nsis": {
       "oneClick": false,
@@ -66,7 +75,8 @@
       "createStartMenuShortcut": true,
       "shortcutName": "StaffPass OCR Hub",
       "installerIcon": "icon.ico",
-      "uninstallerIcon": "icon.ico"
+      "uninstallerIcon": "icon.ico",
+      "allowElevation": true
     }
   }
 }

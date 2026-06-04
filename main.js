@@ -1,12 +1,14 @@
 const { app, BrowserWindow, dialog, ipcMain } = require('electron');
 const path = require('path');
+const { autoUpdater } = require('electron-updater');
 const bridge = require('./sidecar_bridge');
 const db = require('./database');
 
 let ipcRegistered = false;
+let mainWindow = null;
 
 function createWindow() {
-  const win = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
     webPreferences: {
@@ -15,8 +17,8 @@ function createWindow() {
       nodeIntegration: false
     }
   });
-  win.loadFile(path.join(__dirname, 'index.html'));
-  return win;
+  mainWindow.loadFile(path.join(__dirname, 'index.html'));
+  return mainWindow;
 }
 
 function registerIpcHandlers() {
@@ -49,6 +51,14 @@ function registerIpcHandlers() {
     return db.listRecords();
   });
 
+  ipcMain.on('updater:check', () => {
+    autoUpdater.checkForUpdates().catch(() => {});
+  });
+
+  ipcMain.on('updater:install', () => {
+    autoUpdater.quitAndInstall(false, true);
+  });
+
   ipcRegistered = true;
 }
 
@@ -56,10 +66,70 @@ function getRuntimeDatabasePath() {
   return path.join(app.getPath('userData'), 'staffpass.db');
 }
 
+function setupAutoUpdater() {
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
+
+  autoUpdater.on('checking-for-update', () => {
+    if (mainWindow && mainWindow.webContents) {
+      mainWindow.webContents.send('updater:status', { state: 'checking' });
+    }
+  });
+
+  autoUpdater.on('update-available', (info) => {
+    if (mainWindow && mainWindow.webContents) {
+      mainWindow.webContents.send('updater:status', {
+        state: 'available',
+        version: info.version
+      });
+    }
+  });
+
+  autoUpdater.on('update-not-available', () => {
+    if (mainWindow && mainWindow.webContents) {
+      mainWindow.webContents.send('updater:status', { state: 'not-available' });
+    }
+  });
+
+  autoUpdater.on('download-progress', (progress) => {
+    if (mainWindow && mainWindow.webContents) {
+      mainWindow.webContents.send('updater:status', {
+        state: 'downloading',
+        percent: Math.round(progress.percent)
+      });
+    }
+  });
+
+  autoUpdater.on('update-downloaded', (info) => {
+    if (mainWindow && mainWindow.webContents) {
+      mainWindow.webContents.send('updater:status', {
+        state: 'downloaded',
+        version: info.version
+      });
+    }
+  });
+
+  autoUpdater.on('error', (err) => {
+    console.error('Auto-updater error:', err.message);
+    if (mainWindow && mainWindow.webContents) {
+      mainWindow.webContents.send('updater:status', {
+        state: 'error',
+        message: err.message
+      });
+    }
+  });
+}
+
 function startApp() {
   db.init(getRuntimeDatabasePath());
   registerIpcHandlers();
   createWindow();
+  setupAutoUpdater();
+
+  // Check for updates 3 seconds after startup
+  setTimeout(() => {
+    autoUpdater.checkForUpdates().catch(() => {});
+  }, 3000);
 }
 
 if (require.main === module) {
@@ -82,5 +152,6 @@ if (require.main === module) {
 module.exports = {
   createWindow,
   registerIpcHandlers,
+  setupAutoUpdater,
   startApp
 };

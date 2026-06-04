@@ -472,8 +472,74 @@ function loadSavedTheme() {
   return 'light';
 }
 
+function setupAutoUpdateUI() {
+  if (!window.api || !window.api.onUpdateStatus) return;
+
+  window.api.onUpdateStatus((status) => {
+    switch (status.state) {
+      case 'checking':
+        showToast('Checking for updates...');
+        break;
+      case 'available':
+        showToast(`Update v${status.version} available — downloading...`);
+        break;
+      case 'downloading':
+        showToast(`Downloading update... ${status.percent}%`);
+        break;
+      case 'downloaded':
+        showUpdateReadyBanner(status.version);
+        break;
+      case 'not-available':
+        // Silently ignore — no need to notify user they're up to date
+        break;
+      case 'error':
+        // Silently ignore — updater errors are logged in main process
+        break;
+    }
+  });
+}
+
+function showUpdateReadyBanner(version) {
+  let banner = query('update-banner');
+  if (!banner) {
+    banner = document.createElement('div');
+    banner.id = 'update-banner';
+    banner.className = 'update-banner';
+    banner.setAttribute('role', 'alert');
+    document.body.appendChild(banner);
+  }
+
+  banner.innerHTML = '';
+
+  const text = document.createElement('span');
+  text.textContent = `Update v${version} is ready to install. `;
+  banner.appendChild(text);
+
+  const installBtn = document.createElement('button');
+  installBtn.type = 'button';
+  installBtn.className = 'update-banner-btn';
+  installBtn.textContent = 'Restart & Install';
+  installBtn.addEventListener('click', () => {
+    if (window.api && window.api.installUpdate) {
+      window.api.installUpdate();
+    }
+  });
+  banner.appendChild(installBtn);
+
+  const dismissBtn = document.createElement('button');
+  dismissBtn.type = 'button';
+  dismissBtn.className = 'update-banner-dismiss';
+  dismissBtn.textContent = '×';
+  dismissBtn.setAttribute('aria-label', 'Dismiss update notification');
+  dismissBtn.addEventListener('click', () => {
+    banner.remove();
+  });
+  banner.appendChild(dismissBtn);
+}
+
 async function init() {
   applyTheme(loadSavedTheme());
+  setupAutoUpdateUI();
   query('theme-toggle')?.addEventListener('click', toggleTheme);
   query('shortcuts-close')?.addEventListener('click', toggleShortcutsOverlay);
   query('shortcuts-overlay')?.addEventListener('click', (event) => {
