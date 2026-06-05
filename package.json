@@ -9,6 +9,7 @@
   "scripts": {
     "start": "electron .",
     "test": "node tests/run.js",
+    "download-model": "python sidecar/download_model.py",
     "prepare": "husky",
     "rebuild": "electron-builder install-app-deps",
     "dist": "npm run rebuild && electron-builder --win",

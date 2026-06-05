@@ -160,8 +160,12 @@ cd sidecar
 pip install -r requirements.txt
 cd ..
 
+# Pre-download and cache the GLM-OCR model weights (recommended before packaging/offline use)
+npm run download-model
+
 # Start the app in development mode
 npm start
+
 ```
 
 ---
