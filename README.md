@@ -1,6 +1,6 @@
 # StaffPass OCR Hub
 
-[![Version](https://img.shields.io/badge/version-1.2.0-blue.svg)](https://github.com/prasairaul-del/StaffPass-OCR-Hub/releases)
+[![Version](https://img.shields.io/badge/version-1.3.0-blue.svg)](https://github.com/prasairaul-del/StaffPass-OCR-Hub/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](#license)
 [![Electron](https://img.shields.io/badge/Electron-30-9feaf9.svg)](https://www.electronjs.org/)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-blue.svg)](#installation)
@@ -374,41 +374,23 @@ gh release create vX.Y.Z "dist_installer/StaffPass OCR Hub Setup X.Y.Z.exe" \
 
 ---
 
-## OCR Adapter
+## OCR Adapter & Local AI Engine
 
-The OCR system uses a pluggable adapter pattern. To add a new OCR engine:
+The OCR system uses a pluggable adapter pattern. The default development engine is the `MockAdapter`, while production environments utilize a local multimodal AI engine.
 
-1. Create a new class that inherits from `BaseVLMAdapter`:
+### GLM-OCR Integration (CPU-Only Mode)
 
-```python
-from base_adapter import BaseVLMAdapter
+The application includes a CPU-optimized adapter (`sidecar/glmocr_adapter.py`) designed specifically for **hardware-constrained systems** (e.g., computers with 8GB RAM, normal Intel i5 9th/10th generation processors, and no GPU).
 
-class MyOCRAdapter(BaseVLMAdapter):
-    def load(self):
-        # Load your model
-        pass
+- **No GPU Needed:** Runs entirely on CPU using PyTorch and Hugging Face `transformers` (targeting the `zai-org/GLM-OCR` 0.9B parameter model).
+- **No External Services:** Does not require an Ollama service or internet access.
+- **CPU Throttling:** Restricts PyTorch thread counts dynamically to prevent interface lags and system freezes during inference.
 
-    def extract_metadata(self, file_path: str) -> dict:
-        # Process the document and return structured data
-        return {
-            "first_name": "...",
-            "last_name": "...",
-            "doc_type": "...",
-            "doc_number": "...",
-            "expiry_date": "YYYY-MM-DD",
-            "confidence_score": 95,
-            "phone_number": "+971..."
-        }
+### How it Works (Zero-Memory Idle & Cleanup)
 
-    def unload(self):
-        # Free memory
-        pass
-```
-
-2. Update `sidecar/ocr_sidecar.py` to use your adapter
-3. Add any model-specific dependencies to `requirements.txt`
-
-No changes to the Electron app, database, or UI are required.
+To ensure the desktop app remains lightweight:
+1. **On-Demand Loading:** The Python sidecar loads the 0.9B parameter model and processor only when an OCR extraction is explicitly requested, instantly offloading them (`gc.collect()` and PyTorch VRAM cleanups) after inference completes. The idle footprint is virtually zero.
+2. **Process Lifecycle Hooks:** When the Electron app is closed, the main process catches the `will-quit` hook and triggers `SIGKILL` on the Python sidecar process tree, guaranteeing that no orphan Python tasks remain active in Windows Task Manager.
 
 ---
 
@@ -448,6 +430,7 @@ See [CHANGELOG.md](CHANGELOG.md) for a detailed history of all releases.
 
 ### Recent Releases
 
+- **v1.3.0** — Local CPU-optimized GLM-OCR integration, zero-memory idle state, strict lifecycle controls, and Node 26 compatibility runner
 - **v1.2.0** — Dynamic release notes fetched from GitHub Releases API
 - **v1.1.0** — Auto-updater with GitHub Releases, What's new dialog, version display
 - **v1.0.0** — Initial release: dark mode, keyboard shortcuts, Electron packaging, NSIS installer
