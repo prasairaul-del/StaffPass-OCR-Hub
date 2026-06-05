@@ -1075,3 +1075,33 @@ kbd {
     flex-direction: column;
   }
 }
+
+.model-progress-container {
+  margin-top: 8px;
+  width: 100%;
+}
+
+.model-progress-bar {
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  overflow: hidden;
+  border: none;
+  background: var(--bg-hover);
+  color: var(--accent);
+}
+
+.model-progress-bar::-webkit-progress-bar {
+  background-color: var(--bg-hover);
+}
+
+.model-progress-bar::-webkit-progress-value {
+  background-color: var(--accent);
+}
+
+.model-progress-detail {
+  font-size: 11px;
+  color: var(--copy-muted);
+  margin-top: 4px;
+  display: block;
+}

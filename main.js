@@ -78,6 +78,15 @@ function registerIpcHandlers() {
     });
   });
 
+  ipcMain.handle('ocr:downloadModel', async (event) => {
+    const webContents = event.sender;
+    return bridge.downloadModel((status) => {
+      if (webContents && !webContents.isDestroyed()) {
+        webContents.send('ocr:downloadStatus', status);
+      }
+    });
+  });
+
   ipcMain.on('updater:check', () => {
     autoUpdater.checkForUpdates().catch(() => {});
   });
@@ -160,16 +169,28 @@ function startApp() {
 }
 
 if (require.main === module) {
-  app.whenReady().then(startApp);
+  const gotTheLock = app.requestSingleInstanceLock();
+  if (!gotTheLock) {
+    app.quit();
+  } else {
+    app.on('second-instance', () => {
+      if (mainWindow) {
+        if (mainWindow.isMinimized()) mainWindow.restore();
+        mainWindow.focus();
+      }
+    });
 
-  app.on('window-all-closed', () => {
-    if (process.platform !== 'darwin') app.quit();
-  });
+    app.whenReady().then(startApp);
 
-  app.on('will-quit', () => {
-    bridge.stop();
-    db.close();
-  });
+    app.on('window-all-closed', () => {
+      if (process.platform !== 'darwin') app.quit();
+    });
+
+    app.on('will-quit', () => {
+      bridge.stop();
+      db.close();
+    });
+  }
 
   process.on('uncaughtException', (error) => {
     console.error('Unhandled Exception in main process:', error);

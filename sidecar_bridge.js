@@ -4,8 +4,18 @@ const path = require('path');
 let child = null;
 let buffer = '';
 const pending = [];
-const DEFAULT_TIMEOUT_MS = 30000;
+const DEFAULT_TIMEOUT_MS = 180000;
 const PYTHON_CANDIDATES = ['python', 'python3', 'py'];
+
+function getSidecarDir() {
+  if (process.versions.electron) {
+    const { app } = require('electron');
+    if (app.isPackaged) {
+      return path.join(process.resourcesPath, 'sidecar');
+    }
+  }
+  return path.join(__dirname, 'sidecar');
+}
 
 function resolvePython() {
   if (process.env.PYTHON) return process.env.PYTHON;
@@ -23,10 +33,12 @@ function resolvePython() {
 }
 
 function startChild() {
-  const scriptPath = path.join(__dirname, 'sidecar', 'ocr_sidecar.py');
+  const scriptPath = path.join(getSidecarDir(), 'ocr_sidecar.py');
   const python = resolvePython();
+  const env = { OCR_ENGINE: 'glm-ocr', ...process.env };
   child = spawn(python, [scriptPath], {
-    stdio: ['pipe', 'pipe', 'pipe']
+    stdio: ['pipe', 'pipe', 'pipe'],
+    env
   });
 
   child.stdout.on('data', (chunk) => {
@@ -146,4 +158,37 @@ function rejectPending(error) {
   }
 }
 
-module.exports = { runOCR, stop, isRunning };
+function downloadModel(onProgress) {
+  return new Promise((resolve, reject) => {
+    const scriptPath = path.join(getSidecarDir(), 'download_model.py');
+    const python = resolvePython();
+    const env = { OCR_ENGINE: 'glm-ocr', ...process.env };
+    const childProcess = spawn(python, [scriptPath], { env });
+
+    childProcess.stdout.on('data', (chunk) => {
+      if (typeof onProgress === 'function') {
+        onProgress(chunk.toString());
+      }
+    });
+
+    childProcess.stderr.on('data', (chunk) => {
+      if (typeof onProgress === 'function') {
+        onProgress(chunk.toString());
+      }
+    });
+
+    childProcess.on('error', (err) => {
+      reject(err);
+    });
+
+    childProcess.on('exit', (code) => {
+      if (code === 0) {
+        resolve();
+      } else {
+        reject(new Error(`Download model exited with code ${code}`));
+      }
+    });
+  });
+}
+
+module.exports = { runOCR, stop, isRunning, downloadModel };

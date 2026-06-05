@@ -49,6 +49,7 @@
           </button>
         </div>
         <button id="check-updates-btn" class="tool-button rail-update-btn" type="button" data-tooltip="Check for new versions (Ctrl+U)">Check for updates</button>
+        <button id="download-model-btn" class="tool-button rail-update-btn" type="button">Download OCR Model</button>
         <h2 id="system-status-title" class="section-title">System status</h2>
         <dl class="status-list">
           <div>
@@ -62,6 +63,14 @@
           <div>
             <dt>Mode</dt>
             <dd id="workspace-mode">Ingestion</dd>
+          </div>
+          <div>
+            <dt>Model</dt>
+            <dd id="model-download-status">Not verified</dd>
+          </div>
+          <div id="model-progress-container" class="model-progress-container" style="display: none;">
+            <progress id="model-progress-bar" class="model-progress-bar" value="0" max="100"></progress>
+            <span id="model-progress-detail" class="model-progress-detail">0% (0MB / 0MB)</span>
           </div>
         </dl>
       </section>

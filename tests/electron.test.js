@@ -91,6 +91,7 @@ describe('Electron app wiring', () => {
           bridgeFilePath = filePath;
           return { first_name: 'JOHN', file_path: filePath };
         },
+        downloadModel: () => {},
         stop: () => dbCalls.push(['bridge-stop'])
       }
     });
@@ -108,7 +109,7 @@ describe('Electron app wiring', () => {
 
     assert.deepStrictEqual(
       Object.keys(registeredHandlers).sort(),
-      ['app:getVersion', 'documents:select', 'ocr:process', 'records:list', 'release-notes:get', 'review:save']
+      ['app:getVersion', 'documents:select', 'ocr:downloadModel', 'ocr:process', 'records:list', 'release-notes:get', 'review:save']
     );
 
     const selectedFiles = await registeredHandlers['documents:select']();
@@ -157,7 +158,7 @@ describe('Electron app wiring', () => {
     assert.ok(exposed.api);
     assert.deepStrictEqual(
       Object.keys(exposed.api).sort(),
-      ['checkForUpdates', 'fetchReleaseNotes', 'getVersion', 'installUpdate', 'listRecords', 'onUpdateStatus', 'processOCR', 'saveReview', 'selectDocuments']
+      ['checkForUpdates', 'downloadModel', 'fetchReleaseNotes', 'getVersion', 'installUpdate', 'listRecords', 'onDownloadStatus', 'onUpdateStatus', 'processOCR', 'saveReview', 'selectDocuments']
     );
 
     await exposed.api.selectDocuments();

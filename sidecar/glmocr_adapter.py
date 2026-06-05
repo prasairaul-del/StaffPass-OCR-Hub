@@ -40,12 +40,26 @@ class GLMOCRAdapter(BaseVLMAdapter):
             # Fallback local emulation if dependencies not met
             return self._emulate_extraction(file_path)
 
+        temp_path = None
         try:
             from PIL import Image
             import torch
 
             # Open image
             image = Image.open(file_path).convert("RGB")
+
+            # Downsample to speed up CPU inference
+            max_size = 512
+            if max(image.size) > max_size:
+                import tempfile
+                image.thumbnail((max_size, max_size), Image.Resampling.LANCZOS)
+                temp_file = tempfile.NamedTemporaryFile(suffix=".jpg", delete=False)
+                temp_file.close()
+                image.save(temp_file.name)
+                temp_path = temp_file.name
+                process_path = temp_path
+            else:
+                process_path = file_path
 
             # Construct structured query
             prompt = (
@@ -60,7 +74,7 @@ class GLMOCRAdapter(BaseVLMAdapter):
                 {
                     "role": "user",
                     "content": [
-                        {"type": "image", "url": file_path},
+                        {"type": "image", "url": process_path},
                         {"type": "text", "text": prompt}
                     ]
                 }
@@ -70,6 +84,7 @@ class GLMOCRAdapter(BaseVLMAdapter):
                 messages, 
                 tokenize=True, 
                 add_generation_prompt=True, 
+                return_dict=True,
                 return_tensors="pt"
             ).to(self.model.device)
 
@@ -95,6 +110,12 @@ class GLMOCRAdapter(BaseVLMAdapter):
         except Exception as e:
             print(f"Error during GLM-OCR inference: {e}", file=sys.stderr)
             return self._emulate_extraction(file_path)
+        finally:
+            if temp_path:
+                try:
+                    os.remove(temp_path)
+                except Exception:
+                    pass
 
     def unload(self):
         # Unload model from memory to yield resources back to system

@@ -19,5 +19,9 @@ contextBridge.exposeInMainWorld('api', {
   // Auto-updater APIs
   checkForUpdates: () => ipcRenderer.send('updater:check'),
   installUpdate: () => ipcRenderer.send('updater:install'),
-  onUpdateStatus: (callback) => createSafeListener('updater:status', callback)
+  onUpdateStatus: (callback) => createSafeListener('updater:status', callback),
+
+  // Model download APIs
+  downloadModel: () => ipcRenderer.invoke('ocr:downloadModel'),
+  onDownloadStatus: (callback) => createSafeListener('ocr:downloadStatus', callback)
 });

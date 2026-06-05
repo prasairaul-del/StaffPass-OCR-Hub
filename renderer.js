@@ -167,6 +167,45 @@ async function processSelectedOCR() {
   render();
 }
 
+async function downloadModel() {
+  const btn = query('download-model-btn');
+  const statusEl = query('model-download-status');
+  if (!window.api || !window.api.downloadModel) {
+    setStatus('Model download is unavailable.', 'error');
+    return;
+  }
+
+  if (btn) btn.disabled = true;
+  if (statusEl) statusEl.textContent = 'Downloading...';
+  setStatus('Downloading OCR model...');
+
+  const removeListener = window.api.onDownloadStatus((status) => {
+    if (statusEl) {
+      statusEl.textContent = status.message;
+    }
+    if (status.state === 'progress') {
+      setStatus(status.message);
+    } else if (status.state === 'success') {
+      setStatus(status.message, 'success');
+      if (btn) btn.disabled = false;
+      removeListener();
+    } else if (status.state === 'error') {
+      setStatus(status.message, 'error');
+      if (btn) btn.disabled = false;
+      removeListener();
+    }
+  });
+
+  try {
+    await window.api.downloadModel();
+  } catch (error) {
+    setStatus(error.message || 'Model download failed.', 'error');
+    if (statusEl) statusEl.textContent = 'Failed';
+    if (btn) btn.disabled = false;
+    removeListener();
+  }
+}
+
 function readInspectorData() {
   const data = {};
   Object.entries(fields).forEach(([key, id]) => {
@@ -364,6 +403,7 @@ function bindEvents() {
   query('tab-review-queue')?.addEventListener('click', () => setActiveView('review'));
   query('tab-records')?.addEventListener('click', () => setActiveView('records'));
   query('process-selected')?.addEventListener('click', processSelectedOCR);
+  query('download-model-btn')?.addEventListener('click', downloadModel);
   query('clear-queue-btn')?.addEventListener('click', () => {
     state.queue = [];
     state.selectedId = null;
@@ -658,9 +698,75 @@ async function loadVersion() {
   } catch (_err) { /* ignore */ }
 }
 
+function setupModelDownloadUI() {
+  const btn = query('download-model-btn');
+  const statusEl = query('model-download-status');
+  const progressContainer = query('model-progress-container');
+  const progressBar = query('model-progress-bar');
+  const progressDetail = query('model-progress-detail');
+  if (!btn || !window.api || !window.api.downloadModel) return;
+
+  btn.addEventListener('click', async () => {
+    btn.disabled = true;
+    btn.textContent = 'Downloading...';
+    if (statusEl) statusEl.textContent = 'Starting download...';
+    if (progressContainer) progressContainer.style.display = 'block';
+    if (progressBar) progressBar.value = 0;
+    if (progressDetail) progressDetail.textContent = '0% (Connecting...)';
+    showToast('Starting OCR Model download...');
+
+    try {
+      await window.api.downloadModel();
+      btn.textContent = 'Download OCR Model';
+      btn.disabled = false;
+      if (statusEl) statusEl.textContent = 'Ready (Cached)';
+      if (progressContainer) progressContainer.style.display = 'none';
+      showToast('OCR Model cached successfully!');
+    } catch (error) {
+      btn.textContent = 'Download OCR Model';
+      btn.disabled = false;
+      if (statusEl) statusEl.textContent = 'Failed';
+      showToast(`Download failed: ${error.message}`);
+    }
+  });
+
+  if (window.api.onDownloadStatus) {
+    window.api.onDownloadStatus((progress) => {
+      const lastText = progress.trim();
+      if (!lastText) return;
+
+      const percentMatch = lastText.match(/(\d+)%/);
+      const sizeMatch = lastText.match(/([\d\.]+[GMK]B?)\/([\d\.]+[GMK]B?)/i);
+      const speedMatch = lastText.match(/([\d\.]+\s*[GMK]B\/s)/i);
+
+      if (percentMatch) {
+        const percent = parseInt(percentMatch[1], 10);
+        if (progressBar) progressBar.value = percent;
+        
+        let details = `${percent}%`;
+        if (sizeMatch) details += ` (${sizeMatch[0]})`;
+        if (speedMatch) details += ` @ ${speedMatch[1]}`;
+        
+        if (progressDetail) progressDetail.textContent = details;
+        if (statusEl) statusEl.textContent = 'Downloading weights...';
+      } else {
+        const lines = lastText.split('\n').map(l => l.trim()).filter(Boolean);
+        if (lines.length > 0) {
+          const currentTask = lines[lines.length - 1];
+          if (statusEl) statusEl.textContent = currentTask;
+          if (progressDetail && !currentTask.includes('%')) {
+            progressDetail.textContent = currentTask;
+          }
+        }
+      }
+    });
+  }
+}
+
 async function init() {
   applyTheme(loadSavedTheme());
   setupAutoUpdateUI();
+  setupModelDownloadUI();
   loadVersion();
   checkAndShowWhatsNew();
   query('theme-toggle')?.addEventListener('click', toggleTheme);

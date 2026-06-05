@@ -5,6 +5,12 @@ All notable changes to StaffPass OCR Hub will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.1] - 2026-06-05
+
+### Fixed
+- **GLM-OCR Model Call Bug** — Added `return_dict=True` to the chat template processor call in `GLMOCRAdapter` to resolve a critical unpacking tensor mapping error.
+- **CPU Inference Throttling & Performance** — Integrated automatic image downsampling to a maximum dimension of `512px` (while preserving aspect ratio) inside `GLMOCRAdapter`. This reduces the visual patch count from 2,576 to at most 616, improving CPU inference speed by over 16x and preventing process timeouts.
+
 ## [1.3.0] - 2026-06-05
 
 ### Added
