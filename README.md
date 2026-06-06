@@ -1,6 +1,6 @@
 # StaffPass OCR Hub
 
-[![Version](https://img.shields.io/badge/version-1.3.0-blue.svg)](https://github.com/prasairaul-del/StaffPass-OCR-Hub/releases)
+[![Version](https://img.shields.io/badge/version-1.4.0-blue.svg)](https://github.com/prasairaul-del/StaffPass-OCR-Hub/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](#license)
 [![Electron](https://img.shields.io/badge/Electron-30-9feaf9.svg)](https://www.electronjs.org/)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-blue.svg)](#installation)
@@ -36,23 +36,28 @@
 
 ## Features
 
-### Document Processing
+### Document Processing & Batch Intake
 - **Drag-and-drop** file ingestion for quick document uploads
 - **Multi-file selection** via native file picker
+- **Sequential Batch OCR Ingestion** — upload multiple documents and run them sequentially, displaying real-time progress checklist steps ("Preparing...", "Running...", "Saving...")
 - **AI-powered OCR** extraction of staff document metadata (name, document number, expiry, etc.)
 - **Confidence scoring** — each extraction receives a trust score (95%+ = Trusted, 80-94% = Review Recommended, <80% = Manual Review Required)
+- **Local Offline Font Packaging** — all fonts are bundled locally, enabling fully air-gapped system compatibility with zero remote CDN dependencies
 
-### Review Workflow
-- **Review queue** for inspecting and correcting extracted metadata
+### Review Workflow & Document Previews
+- **Side-by-Side Queue Document Previews** — preview scanned documents directly inside the Review Queue before metadata approval
+- **Interactive Review Queue** for inspecting and correcting extracted metadata
+- **Form Validation & Constraints** — inline validation constraints (e.g., expiry date formatted as YYYY-MM-DD, required fields) in the Inspector panel
 - **Approve / Reject / Correct** actions with validation
 - **Saved records table** for browsing previously reviewed staff documents
+- **Real-Time Record Search & Filter** — filter saved records instantaneously by text search queries or document types
 - **Export** records for downstream use
 
-### User Interface
-- **Dark mode** with localStorage persistence and toggle switch
+### User Interface & Aesthetics
+- **Premium Dark Mode UI** — clean slate/zinc HSL color system with glassmorphism sidebar tabs, smooth focus outlines, responsive cards, and micro-animations
 - **Responsive layout** — three-panel design (sidebar, workspace, inspector) that adapts to screen size
 - **Smooth CSS transitions** on buttons, tabs, panels, and status elements
-- **CSS-only tooltips** with keyboard shortcut hints
+- **CSS-only tooltips** with keyboard shortcut hints that trigger precisely on mouse hover
 - **Toast notifications** for status updates and confirmations
 
 ### Keyboard Shortcuts
