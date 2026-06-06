@@ -9,6 +9,7 @@ let ipcRegistered = false;
 let mainWindow = null;
 
 function createWindow() {
+  console.log('[DEBUG] createWindow: creating BrowserWindow...');
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
@@ -18,9 +19,35 @@ function createWindow() {
       nodeIntegration: false
     }
   });
+
+  if (mainWindow.webContents) {
+    mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
+      console.error(`[DEBUG] Page failed to load: ${errorDescription} (${errorCode}) at ${validatedURL}`);
+    });
+
+    mainWindow.webContents.on('render-process-gone', (event, details) => {
+      console.error('[DEBUG] Render process gone:', details);
+    });
+
+    mainWindow.webContents.on('unresponsive', () => {
+      console.warn('[DEBUG] Window became unresponsive');
+    });
+
+    // Listen to renderer console logs
+    mainWindow.webContents.on('console-message', (event, level, message, line, sourceId) => {
+      console.log(`[RENDERER CONSOLE] [Level ${level}] ${message} (at ${sourceId}:${line})`);
+    });
+
+    // Open the DevTools to inspect renderer console
+    mainWindow.webContents.openDevTools();
+  }
+
+  console.log('[DEBUG] loadFile index.html...');
   mainWindow.loadFile(path.join(__dirname, 'index.html'));
   return mainWindow;
 }
+
+
 
 function registerIpcHandlers() {
   if (ipcRegistered) return;
@@ -38,6 +65,24 @@ function registerIpcHandlers() {
     });
 
     return result.canceled ? [] : result.filePaths;
+  });
+
+  ipcMain.handle('documents:readAsBase64', async (event, filePath) => {
+    const fs = require('fs');
+    try {
+      const data = fs.readFileSync(filePath);
+      const ext = path.extname(filePath).toLowerCase();
+      let mimeType = 'image/jpeg';
+      if (ext === '.png') mimeType = 'image/png';
+      else if (ext === '.gif') mimeType = 'image/gif';
+      else if (ext === '.bmp') mimeType = 'image/bmp';
+      else if (ext === '.webp') mimeType = 'image/webp';
+      else if (ext === '.tiff' || ext === '.tif') mimeType = 'image/tiff';
+      return `data:${mimeType};base64,${data.toString('base64')}`;
+    } catch (err) {
+      console.error(err);
+      return null;
+    }
   });
 
   ipcMain.handle('ocr:process', async (event, filePath) => {
@@ -157,43 +202,76 @@ function setupAutoUpdater() {
 }
 
 function startApp() {
-  db.init(getRuntimeDatabasePath());
+  console.log('[DEBUG] startApp: starting...');
+  const dbPath = getRuntimeDatabasePath();
+  console.log('[DEBUG] startApp: database path is', dbPath);
+  db.init(dbPath);
+  console.log('[DEBUG] startApp: database init done');
   registerIpcHandlers();
+  console.log('[DEBUG] startApp: ipc handlers registered');
   createWindow();
+  console.log('[DEBUG] startApp: window created');
   setupAutoUpdater();
+  console.log('[DEBUG] startApp: auto updater setup done');
 
   // Check for updates 3 seconds after startup
   setTimeout(() => {
-    autoUpdater.checkForUpdates().catch(() => {});
+    console.log('[DEBUG] startApp: triggering autoUpdater check');
+    autoUpdater.checkForUpdates().catch((err) => {
+      console.error('[DEBUG] autoUpdater error:', err);
+    });
   }, 3000);
 }
 
-if (require.main === module) {
-  const gotTheLock = app.requestSingleInstanceLock();
+if (require.main === module || !module.parent) {
+  console.log('[DEBUG] main.js execution started at root level');
+  
+  let gotTheLock;
+  try {
+    gotTheLock = app.requestSingleInstanceLock();
+    console.log('[DEBUG] gotSingleInstanceLock result:', gotTheLock);
+  } catch (err) {
+    console.error('[DEBUG] requestSingleInstanceLock failed:', err);
+  }
+
   if (!gotTheLock) {
+    console.log('[DEBUG] Single instance lock NOT obtained, quitting...');
     app.quit();
   } else {
     app.on('second-instance', () => {
+      console.log('[DEBUG] Second instance detected, restoring main window');
       if (mainWindow) {
         if (mainWindow.isMinimized()) mainWindow.restore();
         mainWindow.focus();
       }
     });
 
-    app.whenReady().then(startApp);
+    console.log('[DEBUG] Registering app whenReady handler');
+    app.whenReady().then(() => {
+      console.log('[DEBUG] app whenReady fired');
+      startApp();
+    }).catch(err => {
+      console.error('[DEBUG] app.whenReady rejected:', err);
+    });
 
     app.on('window-all-closed', () => {
+      console.log('[DEBUG] window-all-closed event fired');
       if (process.platform !== 'darwin') app.quit();
     });
 
     app.on('will-quit', () => {
+      console.log('[DEBUG] will-quit event fired');
       bridge.stop();
       db.close();
     });
   }
 
   process.on('uncaughtException', (error) => {
-    console.error('Unhandled Exception in main process:', error);
+    console.error('[DEBUG] Unhandled Exception in main process:', error);
+  });
+  
+  process.on('unhandledRejection', (reason) => {
+    console.error('[DEBUG] Unhandled Rejection in main process:', reason);
   });
 }
 
@@ -203,3 +281,4 @@ module.exports = {
   setupAutoUpdater,
   startApp
 };
+

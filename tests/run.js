@@ -90,9 +90,11 @@ const runTests = async () => {
       await afterFn();
     }
   }
+  process.exit(process.exitCode || 0);
 };
 
 runTests().catch(err => {
   console.error(err);
   process.exit(1);
 });
+

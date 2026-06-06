@@ -41,4 +41,26 @@ describe('Renderer UI Helpers', () => {
     assert.strictEqual(item.status, 'queued');
     assert.strictEqual(item.reviewStatus, 'Pending Review');
   });
+
+  it('should validate expiry date format YYYY-MM-DD', () => {
+    const errors = validateReviewData({
+      first_name: 'John',
+      last_name: 'Doe',
+      doc_type: 'Passport',
+      doc_number: '1234',
+      expiry_date: '2026/12/31'
+    });
+    assert.deepStrictEqual(errors, ['Expiry date format must be YYYY-MM-DD.']);
+  });
+
+  it('should parse and format file sizes in createQueueItem', () => {
+    const itemB = createQueueItem('C:\\test.jpg', 512);
+    assert.strictEqual(itemB.fileSize, '512 B');
+
+    const itemKB = createQueueItem('C:\\test.jpg', 1536);
+    assert.strictEqual(itemKB.fileSize, '1.5 KB');
+
+    const itemMB = createQueueItem('C:\\test.jpg', 1048576 * 2.5);
+    assert.strictEqual(itemMB.fileSize, '2.5 MB');
+  });
 });

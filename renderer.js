@@ -27,6 +27,11 @@ function validateReviewData(data) {
   if (!String(data.last_name || '').trim()) errors.push('Last name is required.');
   if (!String(data.doc_type || '').trim()) errors.push('Document type is required.');
   if (!String(data.doc_number || '').trim()) errors.push('Document number is required.');
+  
+  const expiry = String(data.expiry_date || '').trim();
+  if (expiry && !/^\d{4}-\d{2}-\d{2}$/.test(expiry)) {
+    errors.push('Expiry date format must be YYYY-MM-DD.');
+  }
   return errors;
 }
 
@@ -42,12 +47,19 @@ function normalizeExtraction(result = {}) {
   };
 }
 
-function createQueueItem(filePath) {
+function createQueueItem(filePath, fileSize = null) {
   const fileName = filePath.split(/[\\/]/).pop() || filePath;
+  let sizeStr = 'Unknown';
+  if (fileSize !== null) {
+    if (fileSize < 1024) sizeStr = `${fileSize} B`;
+    else if (fileSize < 1024 * 1024) sizeStr = `${(fileSize / 1024).toFixed(1)} KB`;
+    else sizeStr = `${(fileSize / (1024 * 1024)).toFixed(1)} MB`;
+  }
   return {
     id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
     filePath,
     fileName,
+    fileSize: sizeStr,
     source: filePath,
     receivedAt: new Date().toLocaleString(),
     status: 'queued',
@@ -121,12 +133,126 @@ function addFiles(filePaths) {
     return;
   }
 
-  const items = paths.map(createQueueItem);
+  const items = paths.map(f => {
+    const path = typeof f === 'string' ? f : (f.path || f);
+    const size = typeof f === 'object' && f ? f.size : null;
+    return createQueueItem(path, size);
+  });
   state.queue.push(...items);
-  state.selectedId = items[0].id;
-  setActiveView('review');
+  if (!state.selectedId && items.length > 0) {
+    state.selectedId = items[0].id;
+  }
   setStatus(`${items.length} document${items.length === 1 ? '' : 's'} added to the queue.`, 'success');
   render();
+}
+
+function removeIngestedFile(id) {
+  state.queue = state.queue.filter(item => item.id !== id);
+  if (state.selectedId === id) {
+    state.selectedId = state.queue.length > 0 ? state.queue[0].id : null;
+  }
+  setStatus('Document removed from queue.');
+  render();
+}
+
+function renderIngestionQueue() {
+  const body = query('ingestion-queue-body');
+  if (!body) return;
+  body.innerHTML = '';
+
+  if (state.queue.length === 0) {
+    const row = document.createElement('tr');
+    const cell = document.createElement('td');
+    cell.colSpan = 4;
+    cell.className = 'queue-empty';
+    cell.textContent = 'No documents ingested yet.';
+    row.appendChild(cell);
+    body.appendChild(row);
+    return;
+  }
+
+  state.queue.forEach((item) => {
+    const row = document.createElement('tr');
+
+    const nameCell = document.createElement('td');
+    nameCell.textContent = item.fileName;
+    row.appendChild(nameCell);
+
+    const sizeCell = document.createElement('td');
+    sizeCell.textContent = item.fileSize || 'Unknown';
+    row.appendChild(sizeCell);
+
+    const statusCell = document.createElement('td');
+    statusCell.textContent = item.status;
+    row.appendChild(statusCell);
+
+    const actionsCell = document.createElement('td');
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'tool-button';
+    removeBtn.style.color = 'var(--status-rejected, #e06c75)';
+    removeBtn.style.border = '1px solid var(--status-rejected, #e06c75)';
+    removeBtn.style.minHeight = '28px';
+    removeBtn.style.padding = '0 8px';
+    removeBtn.textContent = 'Remove';
+    removeBtn.addEventListener('click', () => removeIngestedFile(item.id));
+    actionsCell.appendChild(removeBtn);
+    row.appendChild(actionsCell);
+
+    body.appendChild(row);
+  });
+}
+
+async function updateDocumentPreview(item) {
+  const containers = [query('document-preview-container'), query('review-preview-container')].filter(Boolean);
+  if (containers.length === 0) return;
+
+  if (!item) {
+    containers.forEach(c => {
+      c.innerHTML = '<span style="color: var(--muted, #666);">No document selected</span>';
+    });
+    return;
+  }
+
+  const ext = item.fileName.split('.').pop().toLowerCase();
+  const isImage = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'tiff', 'tif'].includes(ext);
+  const isPdf = ext === 'pdf';
+
+  if (isImage) {
+    containers.forEach(c => {
+      c.innerHTML = '<span style="color: var(--muted, #666);">Loading preview...</span>';
+    });
+    try {
+      if (window.api && window.api.readAsBase64) {
+        const base64Data = await window.api.readAsBase64(item.filePath);
+        if (base64Data) {
+          containers.forEach(c => {
+            c.innerHTML = `<img src="${base64Data}" alt="${item.fileName}" style="max-width: 100%; max-height: 100%; object-fit: contain; border-radius: var(--radius);">`;
+          });
+          return;
+        }
+      }
+    } catch (err) {
+      console.error(err);
+    }
+    containers.forEach(c => {
+      c.innerHTML = `<span style="color: var(--status-rejected, #e06c75);">Failed to load preview</span>`;
+    });
+  } else if (isPdf) {
+    containers.forEach(c => {
+      c.innerHTML = `
+        <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; text-align: center; color: var(--text);">
+          <span style="font-size: 2.5rem; line-height: 1;">📄</span>
+          <strong style="font-size: 0.9rem;">PDF Mock Preview Frame</strong>
+          <span style="font-size: 0.75rem; color: var(--muted); max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${item.fileName}</span>
+        </div>
+      `;
+    });
+  } else {
+    containers.forEach(c => {
+      c.innerHTML = `<span style="color: var(--muted, #666);">No preview available for this format</span>`;
+    });
+  }
 }
 
 async function selectDocuments() {
@@ -137,34 +263,117 @@ async function selectDocuments() {
   addFiles(await window.api.selectDocuments());
 }
 
-async function processSelectedOCR() {
-  const item = getSelectedItem();
-  if (!item) {
-    setStatus('Select a queued document before running OCR.', 'error');
+let isBatchProcessing = false;
+
+async function processBatchOCR() {
+  if (isBatchProcessing) return;
+
+  const itemsToProcess = state.queue.filter(item => ['queued', 'error'].includes(item.status));
+  if (itemsToProcess.length === 0) {
+    setStatus('No pending documents to process.', 'error');
     return;
   }
+
   if (!window.api || !window.api.processOCR) {
     setStatus('OCR bridge is unavailable.', 'error');
     return;
   }
 
-  item.status = 'processing';
-  item.error = null;
-  setStatus(`Processing ${item.fileName}...`);
-  render();
+  isBatchProcessing = true;
+  const batchContainer = query('batch-progress-container');
+  const batchProgressBar = query('batch-progress-bar');
+  const batchProgressText = query('batch-progress-text');
 
-  try {
-    item.extraction = normalizeExtraction(await window.api.processOCR(item.filePath));
-    item.status = 'review';
-    item.reviewStatus = getConfidenceStatus(item.extraction.confidence_score);
-    setStatus(`${item.fileName} is ready for review.`, 'success');
-  } catch (error) {
-    item.status = 'error';
-    item.error = error.message || 'OCR failed.';
-    setStatus(item.error, 'error');
+  if (batchContainer) batchContainer.style.display = 'block';
+
+  const stepPrep = query('step-preparing');
+  const stepRun = query('step-running');
+  const stepSave = query('step-saving');
+
+  const updateStep = (stepEl, stepState) => {
+    if (!stepEl) return;
+    stepEl.className = 'checklist-step';
+    const icon = stepEl.querySelector('.step-icon');
+    if (stepState === 'pending') {
+      stepEl.style.color = 'var(--muted)';
+      if (icon) icon.textContent = '○';
+    } else if (stepState === 'active') {
+      stepEl.classList.add('step-active');
+      if (icon) icon.textContent = '●';
+    } else if (stepState === 'completed') {
+      stepEl.classList.add('step-completed');
+      if (icon) icon.textContent = '✓';
+    }
+  };
+
+  setStatus(`Starting batch OCR on ${itemsToProcess.length} documents...`);
+
+  for (let i = 0; i < itemsToProcess.length; i++) {
+    const item = itemsToProcess[i];
+    state.selectedId = item.id;
+    item.status = 'processing';
+    item.error = null;
+
+    if (batchProgressText) {
+      batchProgressText.textContent = `Processing ${i + 1} of ${itemsToProcess.length}: ${item.fileName}`;
+    }
+    if (batchProgressBar) {
+      batchProgressBar.value = Math.round((i / itemsToProcess.length) * 100);
+    }
+
+    render();
+
+    // Step 1: Preparing
+    updateStep(stepPrep, 'active');
+    updateStep(stepRun, 'pending');
+    updateStep(stepSave, 'pending');
+    await new Promise(r => setTimeout(r, 600));
+
+    // Step 2: Running Model
+    updateStep(stepPrep, 'completed');
+    updateStep(stepRun, 'active');
+    await new Promise(r => setTimeout(r, 400));
+
+    try {
+      const rawResult = await window.api.processOCR(item.filePath);
+      item.extraction = normalizeExtraction(rawResult);
+      item.status = 'review';
+      item.reviewStatus = getConfidenceStatus(item.extraction.confidence_score);
+
+      // Step 3: Saving
+      updateStep(stepRun, 'completed');
+      updateStep(stepSave, 'active');
+      await new Promise(r => setTimeout(r, 500));
+      updateStep(stepSave, 'completed');
+
+    } catch (error) {
+      item.status = 'error';
+      item.error = error.message || 'OCR failed.';
+      updateStep(stepRun, 'pending');
+      updateStep(stepSave, 'pending');
+      setStatus(item.error, 'error');
+    }
+
+    render();
+    await new Promise(r => setTimeout(r, 500));
   }
 
+  if (batchProgressBar) batchProgressBar.value = 100;
+  if (batchProgressText) batchProgressText.textContent = `Completed batch processing of ${itemsToProcess.length} files.`;
+
+  isBatchProcessing = false;
+  setStatus('Batch processing complete.', 'success');
+
+  setActiveView('review');
   render();
+
+  setTimeout(() => {
+    if (batchContainer) batchContainer.style.display = 'none';
+  }, 3000);
+}
+
+async function processSelectedOCR() {
+  await processBatchOCR();
 }
 
 async function downloadModel() {
@@ -209,13 +418,47 @@ async function downloadModel() {
 function readInspectorData() {
   const data = {};
   Object.entries(fields).forEach(([key, id]) => {
-    data[key] = (query(id)?.textContent || '').replace(/^-$/, '').trim();
+    const el = query(id);
+    if (el) {
+      if (el.tagName === 'INPUT') {
+        data[key] = (el.value || '').replace(/^-$/, '').trim();
+      } else {
+        data[key] = (el.textContent || '').replace(/^-$/, '').trim();
+      }
+    }
   });
   const selected = getSelectedItem();
   data.confidence_score = selected?.extraction?.confidence_score || 0;
   const notesEl = query('correction-notes');
   data.notes = notesEl ? notesEl.value.trim() : '';
   return data;
+}
+
+function displayInlineWarnings(errors) {
+  const warnings = ['first-name', 'last-name', 'id-number', 'doc-type', 'expiry-date'];
+  warnings.forEach(w => {
+    const el = query(`warn-${w}`);
+    if (el) el.style.display = 'none';
+  });
+
+  errors.forEach(err => {
+    if (err.includes('First name')) {
+      const el = query('warn-first-name');
+      if (el) el.style.display = 'block';
+    } else if (err.includes('Last name')) {
+      const el = query('warn-last-name');
+      if (el) el.style.display = 'block';
+    } else if (err.includes('Document number')) {
+      const el = query('warn-id-number');
+      if (el) el.style.display = 'block';
+    } else if (err.includes('Document type')) {
+      const el = query('warn-doc-type');
+      if (el) el.style.display = 'block';
+    } else if (err.includes('Expiry date') || err.includes('date format')) {
+      const el = query('warn-expiry-date');
+      if (el) el.style.display = 'block';
+    }
+  });
 }
 
 function setValidationErrors(errors) {
@@ -238,6 +481,7 @@ async function saveSelectedReview(reviewStatus) {
 
   const data = readInspectorData();
   const errors = validateReviewData(data);
+  displayInlineWarnings(errors);
   if (errors.length > 0) {
     setValidationErrors(errors);
     setStatus(errors[0], 'error');
@@ -345,8 +589,15 @@ function renderSelected() {
   text('overall-confidence', `${confidence}%`);
 
   Object.entries(fields).forEach(([key, id]) => {
-    const value = item?.extraction?.[key] || '-';
-    text(id, value);
+    const value = item?.extraction?.[key] || '';
+    const el = query(id);
+    if (el) {
+      if (el.tagName === 'INPUT') {
+        el.value = value;
+      } else {
+        text(id, value || '-');
+      }
+    }
   });
 
   const notesEl = query('correction-notes');
@@ -354,7 +605,15 @@ function renderSelected() {
     notesEl.value = item?.notes || '';
   }
 
+  // Clear inline warnings
+  const warnings = ['first-name', 'last-name', 'id-number', 'doc-type', 'expiry-date'];
+  warnings.forEach(w => {
+    const el = query(`warn-${w}`);
+    if (el) el.style.display = 'none';
+  });
+
   setValidationErrors([]);
+  updateDocumentPreview(item);
 }
 
 function renderRecords() {
@@ -362,7 +621,29 @@ function renderRecords() {
   if (!body) return;
   body.innerHTML = '';
 
-  if (state.records.length === 0) {
+  const searchText = (query('record-search-input')?.value || '').toLowerCase().trim();
+  const typeFilter = query('record-type-filter')?.value || '';
+
+  const filteredRecords = state.records.filter((record) => {
+    if (typeFilter && record.doc_type !== typeFilter) {
+      return false;
+    }
+    if (searchText) {
+      const firstName = (record.first_name || '').toLowerCase();
+      const lastName = (record.last_name || '').toLowerCase();
+      const docNum = (record.doc_number || '').toLowerCase();
+      const docType = (record.doc_type || '').toLowerCase();
+      
+      const matchSearch = firstName.includes(searchText) || 
+                          lastName.includes(searchText) || 
+                          docNum.includes(searchText) || 
+                          docType.includes(searchText);
+      if (!matchSearch) return false;
+    }
+    return true;
+  });
+
+  if (filteredRecords.length === 0) {
     const row = document.createElement('tr');
     const cell = document.createElement('td');
     cell.colSpan = 7;
@@ -372,7 +653,7 @@ function renderRecords() {
     return;
   }
 
-  state.records.forEach((record) => {
+  filteredRecords.forEach((record) => {
     const row = document.createElement('tr');
     [
       `${record.first_name || ''} ${record.last_name || ''}`.trim(),
@@ -393,6 +674,7 @@ function renderRecords() {
 
 function render() {
   renderMetrics();
+  renderIngestionQueue();
   renderQueue();
   renderSelected();
   renderRecords();
@@ -428,9 +710,16 @@ function bindEvents() {
   query('correct-btn')?.addEventListener('click', () => saveSelectedReview('Corrected'));
   query('save-corrections-btn')?.addEventListener('click', () => saveSelectedReview('Corrected'));
 
+  query('record-search-input')?.addEventListener('input', () => {
+    renderRecords();
+  });
+  query('record-type-filter')?.addEventListener('change', () => {
+    renderRecords();
+  });
+
   query('file-input')?.addEventListener('change', (event) => {
-    const paths = Array.from(event.target.files || []).map((file) => file.path).filter(Boolean);
-    if (paths.length > 0) addFiles(paths);
+    const files = Array.from(event.target.files || []);
+    if (files.length > 0) addFiles(files);
     event.target.value = '';
   });
 
@@ -451,7 +740,8 @@ function bindEvents() {
     dropZone.addEventListener('drop', (event) => {
       event.preventDefault();
       dropZone.classList.remove('is-dragging');
-      addFiles(Array.from(event.dataTransfer.files || []).map((file) => file.path).filter(Boolean));
+      const files = Array.from(event.dataTransfer.files || []);
+      if (files.length > 0) addFiles(files);
     });
   }
 }

@@ -4,8 +4,22 @@ All notable changes to StaffPass OCR Hub will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [1.4.0] - 2026-06-06
+
+### Added
+- **Local Offline Font Packaging** — Packaged Inter and Outfit font assets locally to support offline-ready air-gapped system deployments.
+- **Queue Document Preview Container** — Side-by-side preview window in the Review Queue utilizing a secure `documents:readAsBase64` IPC channel to render selected document scans before approval.
+- **Batch OCR Sequential Ingestion** — Upgraded ingestion tab with sequential multi-file batch execution and step-by-step progress tracking checkcards.
+- **Saved Records Search & Filtering** — Real-time textual search filter and category dropdown selector to quickly browse saved staff records.
+- **Metadata Inspector validation** — Form-field live validation constraints (required elements and YYYY-MM-DD date patterns) with inline warning badges.
+- **UI/UX Aesthetics & Fluid Theme** — Overhauled interface layout with modern slate-zinc HSL palettes, glassmorphism tabs, responsive grids, and bouncy micro-animations.
+
+### Fixed
+- **Startup Launch Loop** — Corrected main process entry loop check to launch successfully when run under modern Electron environments.
+- **CSP & Style Application** — Updated the Content Security Policy style-src headers in `index.html` to allow `style-src 'unsafe-inline'` to resolve renderer style application warnings.
 
 ## [1.3.1] - 2026-06-05
+
 
 ### Fixed
 - **GLM-OCR Model Call Bug** — Added `return_dict=True` to the chat template processor call in `GLMOCRAdapter` to resolve a critical unpacking tensor mapping error.

@@ -2,20 +2,11 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-j/hFBNQCS2J6IP+X/UULn3LgQG1mR4scgjPscTqZHYQ='; style-src 'self'; img-src 'self' data:; connect-src 'self'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>StaffPass Local OCR Hub</title>
   <link rel="stylesheet" href="index.css">
-  <script>
-    (function() {
-      try {
-        var theme = localStorage.getItem('staffpass-theme');
-        if (theme === 'dark' || theme === 'light') {
-          document.documentElement.setAttribute('data-theme', theme);
-        }
-      } catch (_e) {}
-    })();
-  </script>
+
 </head>
 <body>
   <div id="app" class="app-shell" aria-label="StaffPass OCR workspace">
@@ -108,6 +99,48 @@
             <span id="drop-zone-help">PDF, PNG, JPG, TIFF, and similar scans are supported.</span>
           </div>
         </div>
+
+        <!-- Ingestion Queue Listing -->
+        <div id="ingestion-queue-container" class="ingestion-queue-container" style="margin-top: 1.5rem;">
+          <h4 class="panel-subtitle" style="margin-bottom: 0.75rem;">Ingested Files (Before OCR)</h4>
+          <div class="table-frame" role="region" aria-labelledby="ingestion-queue-title" tabindex="0">
+            <table class="queue-table">
+              <thead>
+                <tr>
+                  <th scope="col">Document</th>
+                  <th scope="col">Size</th>
+                  <th scope="col">Status</th>
+                  <th scope="col">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="ingestion-queue-body">
+                <tr class="queue-empty">
+                  <td colspan="4">No documents ingested yet.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Batch OCR progress checklist -->
+        <div id="batch-progress-container" class="surface" style="display: none; margin-top: 15px; padding: 15px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--surface-alt);">
+          <h4 class="panel-subtitle" style="margin-bottom: 10px;">Batch OCR Processing</h4>
+          <div id="batch-progress-text" style="font-size: 0.9rem; margin-bottom: 10px; font-weight: 600;">Processing 0 of 0 files...</div>
+          <progress id="batch-progress-bar" value="0" max="100" style="width: 100%; height: 8px; border-radius: 4px; overflow: hidden; margin-bottom: 15px;"></progress>
+          
+          <ul id="batch-checklist" style="list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; font-size: 0.9rem;">
+            <li id="step-preparing" class="checklist-step" style="display: flex; align-items: center; gap: 8px; color: var(--muted);">
+              <span class="step-icon">○</span> Preparing document...
+            </li>
+            <li id="step-running" class="checklist-step" style="display: flex; align-items: center; gap: 8px; color: var(--muted);">
+              <span class="step-icon">○</span> Running model prediction...
+            </li>
+            <li id="step-saving" class="checklist-step" style="display: flex; align-items: center; gap: 8px; color: var(--muted);">
+              <span class="step-icon">○</span> Saving results...
+            </li>
+          </ul>
+        </div>
+
         <p id="app-status" class="app-status" data-tone="neutral" aria-live="polite">Ready for local document intake.</p>
       </section>
 
@@ -129,24 +162,32 @@
           </div>
         </div>
 
-        <div class="table-frame" role="region" aria-labelledby="queue-title" tabindex="0">
-          <table class="queue-table" id="queue-table">
-            <caption class="sr-only">OCR review queue</caption>
-            <thead>
-              <tr>
-                <th scope="col">Document</th>
-                <th scope="col">Type</th>
-                <th scope="col">Status</th>
-                <th scope="col">Confidence</th>
-                <th scope="col">Updated</th>
-              </tr>
-            </thead>
-            <tbody id="queue-table-body">
-              <tr class="queue-empty">
-                <td colspan="5">No documents in queue.</td>
-              </tr>
-            </tbody>
-          </table>
+        <div class="review-split-container" style="display: grid; grid-template-columns: 2fr 1fr; gap: 12px; margin-top: 10px;">
+          <div class="table-frame" role="region" aria-labelledby="queue-title" tabindex="0" style="margin: 0;">
+            <table class="queue-table" id="queue-table">
+              <caption class="sr-only">OCR review queue</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Document</th>
+                  <th scope="col">Type</th>
+                  <th scope="col">Status</th>
+                  <th scope="col">Confidence</th>
+                  <th scope="col">Updated</th>
+                </tr>
+              </thead>
+              <tbody id="queue-table-body">
+                <tr class="queue-empty">
+                  <td colspan="5">No documents in queue.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="surface" style="padding: 12px; display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-alt);">
+            <h4 class="card-title" style="margin-bottom: 8px; font-size: 0.88rem;">Queue Preview</h4>
+            <div id="review-preview-container" class="preview-container" style="flex: 1; border: 1px dashed var(--border-strong); border-radius: var(--radius); display: flex; align-items: center; justify-content: center; min-height: 150px; overflow: hidden; background: var(--surface); padding: 5px; box-sizing: border-box;">
+              <span style="color: var(--muted);">No document selected</span>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -186,6 +227,13 @@
             <h4 id="document-notes-title" class="card-title">Processing notes</h4>
             <p id="document-notes" class="notes-copy">Select a queued document to view extraction notes and review guidance.</p>
           </article>
+
+          <article class="summary-card" aria-labelledby="document-preview-title" id="document-preview-card">
+            <h4 id="document-preview-title" class="card-title">Document preview</h4>
+            <div id="document-preview-container" class="preview-container" style="border: 1px dashed var(--border-strong, #ccc); border-radius: var(--radius); display: flex; align-items: center; justify-content: center; min-height: 150px; height: 100%; overflow: hidden; background: var(--surface); padding: 10px; box-sizing: border-box;">
+              <span style="color: var(--muted, #666);">No document selected</span>
+            </div>
+          </article>
         </div>
       </section>
 
@@ -197,6 +245,20 @@
           </div>
           <button id="refresh-records" class="tool-button" type="button">Refresh records</button>
         </div>
+
+        <!-- Saved Records Filtering Controls -->
+        <div class="filter-controls" style="display: flex; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; align-items: center; padding: 0 4px;">
+          <input id="record-search-input" class="correction-textarea" style="flex: 1; min-height: 36px; padding: 0 12px;" type="text" placeholder="Search by name, document number, or type...">
+          <select id="record-type-filter" class="tool-button" style="min-height: 36px; padding: 0 12px; cursor: pointer; background: var(--surface);">
+            <option value="">All Document Types</option>
+            <option value="Staff Pass">Staff Pass</option>
+            <option value="ID Card">ID Card</option>
+            <option value="Passport">Passport</option>
+            <option value="Visa">Visa</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+
         <div class="table-frame" role="region" aria-labelledby="records-title" tabindex="0">
           <table class="queue-table">
             <caption class="sr-only">Saved staff document records</caption>
@@ -231,32 +293,43 @@
           <div class="confidence-chip" id="overall-confidence">0%</div>
         </div>
 
-        <dl class="field-list" id="extracted-fields-list">
-          <div class="field-row">
-            <dt>First name</dt>
-            <dd id="field-first-name" contenteditable="true" role="textbox" aria-label="First name">-</dd>
+        <div class="field-list" id="extracted-fields-list" style="display: grid; gap: 12px; margin-bottom: 14px;">
+          <div class="field-row-wrapper" style="display: flex; flex-direction: column; gap: 4px;">
+            <label class="field-label" style="font-weight: 600;" for="field-first-name">First name *</label>
+            <input type="text" id="field-first-name" class="correction-textarea" style="min-height: 36px; padding: 0 10px; resize: none; margin: 0;" aria-label="First name">
+            <span id="warn-first-name" class="inline-warning" style="color: var(--danger, #e06c75); font-size: 0.8rem; display: none; font-weight: 600;">First name is required.</span>
           </div>
-          <div class="field-row">
-            <dt>Last name</dt>
-            <dd id="field-last-name" contenteditable="true" role="textbox" aria-label="Last name">-</dd>
+          
+          <div class="field-row-wrapper" style="display: flex; flex-direction: column; gap: 4px;">
+            <label class="field-label" style="font-weight: 600;" for="field-last-name">Last name *</label>
+            <input type="text" id="field-last-name" class="correction-textarea" style="min-height: 36px; padding: 0 10px; resize: none; margin: 0;" aria-label="Last name">
+            <span id="warn-last-name" class="inline-warning" style="color: var(--danger, #e06c75); font-size: 0.8rem; display: none; font-weight: 600;">Last name is required.</span>
           </div>
-          <div class="field-row">
-            <dt>Document number</dt>
-            <dd id="field-id-number" contenteditable="true" role="textbox" aria-label="Document number">-</dd>
+
+          <div class="field-row-wrapper" style="display: flex; flex-direction: column; gap: 4px;">
+            <label class="field-label" style="font-weight: 600;" for="field-id-number">Document number *</label>
+            <input type="text" id="field-id-number" class="correction-textarea" style="min-height: 36px; padding: 0 10px; resize: none; margin: 0;" aria-label="Document number">
+            <span id="warn-id-number" class="inline-warning" style="color: var(--danger, #e06c75); font-size: 0.8rem; display: none; font-weight: 600;">Document number is required.</span>
           </div>
-          <div class="field-row">
-            <dt>Document type</dt>
-            <dd id="field-doc-type" contenteditable="true" role="textbox" aria-label="Document type">-</dd>
+
+          <div class="field-row-wrapper" style="display: flex; flex-direction: column; gap: 4px;">
+            <label class="field-label" style="font-weight: 600;" for="field-doc-type">Document type *</label>
+            <input type="text" id="field-doc-type" class="correction-textarea" style="min-height: 36px; padding: 0 10px; resize: none; margin: 0;" aria-label="Document type">
+            <span id="warn-doc-type" class="inline-warning" style="color: var(--danger, #e06c75); font-size: 0.8rem; display: none; font-weight: 600;">Document type is required.</span>
           </div>
-          <div class="field-row">
-            <dt>Expiry date</dt>
-            <dd id="field-expiry-date" contenteditable="true" role="textbox" aria-label="Expiry date">-</dd>
+
+          <div class="field-row-wrapper" style="display: flex; flex-direction: column; gap: 4px;">
+            <label class="field-label" style="font-weight: 600;" for="field-expiry-date">Expiry date</label>
+            <input type="text" id="field-expiry-date" class="correction-textarea" style="min-height: 36px; padding: 0 10px; resize: none; margin: 0;" placeholder="YYYY-MM-DD" aria-label="Expiry date">
+            <span id="warn-expiry-date" class="inline-warning" style="color: var(--danger, #e06c75); font-size: 0.8rem; display: none; font-weight: 600;">Date format should be YYYY-MM-DD.</span>
           </div>
-          <div class="field-row">
-            <dt>Phone number</dt>
-            <dd id="field-phone-number" contenteditable="true" role="textbox" aria-label="Phone number">-</dd>
+
+          <div class="field-row-wrapper" style="display: flex; flex-direction: column; gap: 4px;">
+            <label class="field-label" style="font-weight: 600;" for="field-phone-number">Phone number</label>
+            <input type="text" id="field-phone-number" class="correction-textarea" style="min-height: 36px; padding: 0 10px; resize: none; margin: 0;" aria-label="Phone number">
+            <span id="warn-phone-number" class="inline-warning" style="color: var(--danger, #e06c75); font-size: 0.8rem; display: none; font-weight: 600;"></span>
           </div>
-        </dl>
+        </div>
         <ul id="validation-errors" class="validation-errors" aria-live="polite"></ul>
       </section>
 

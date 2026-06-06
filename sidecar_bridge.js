@@ -9,9 +9,13 @@ const PYTHON_CANDIDATES = ['python', 'python3', 'py'];
 
 function getSidecarDir() {
   if (process.versions.electron) {
-    const { app } = require('electron');
-    if (app.isPackaged) {
-      return path.join(process.resourcesPath, 'sidecar');
+    try {
+      const electron = require('electron');
+      if (electron && electron.app && electron.app.isPackaged) {
+        return path.join(process.resourcesPath, 'sidecar');
+      }
+    } catch (e) {
+      // Safe fallback
     }
   }
   return path.join(__dirname, 'sidecar');
