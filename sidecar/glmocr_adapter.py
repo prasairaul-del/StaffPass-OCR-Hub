@@ -13,6 +13,7 @@ class GLMOCRAdapter(BaseVLMAdapter):
         self.processor = None
         self.model = None
         self.model_id = "zai-org/GLM-OCR"
+        self.load_error = None
 
     def load(self):
         # Configure torch thread count for CPU stability
@@ -23,6 +24,7 @@ class GLMOCRAdapter(BaseVLMAdapter):
             pass
 
         # Dynamically import transformers to prevent import crashes when dependencies are missing
+        self.load_error = None
         try:
             from transformers import AutoProcessor, GlmOcrForConditionalGeneration
             print(f"Loading GLM-OCR model {self.model_id} on CPU...", file=sys.stderr)
@@ -33,12 +35,15 @@ class GLMOCRAdapter(BaseVLMAdapter):
             )
             print("GLM-OCR model loaded successfully.", file=sys.stderr)
         except Exception as e:
-            print(f"Warning: Failed to load GLM-OCR dependencies/model: {e}. Running in local emulation fallback mode.", file=sys.stderr)
+            self.load_error = str(e)
+            print(f"Warning: Failed to load GLM-OCR dependencies/model: {e}. Manual review will be required.", file=sys.stderr)
 
     def extract_metadata(self, file_path: str) -> dict:
         if not self.model or not self.processor:
-            # Fallback local emulation if dependencies not met
-            return self._emulate_extraction(file_path)
+            return self._manual_review_required(
+                file_path,
+                "GLM-OCR model is unavailable; no identity data was inferred."
+            )
 
         temp_path = None
         try:
@@ -102,14 +107,16 @@ class GLMOCRAdapter(BaseVLMAdapter):
             # Clean and parse JSON from output
             extracted_data = self._clean_and_parse_json(decoded)
             
-            # Add static or calculated confidence score
             extracted_data["confidence_score"] = 92
-            
-            return extracted_data
+
+            return self._success_response(extracted_data)
 
         except Exception as e:
             print(f"Error during GLM-OCR inference: {e}", file=sys.stderr)
-            return self._emulate_extraction(file_path)
+            return self._manual_review_required(
+                file_path,
+                "GLM-OCR inference failed; no identity data was inferred."
+            )
         finally:
             if temp_path:
                 try:
@@ -152,8 +159,16 @@ class GLMOCRAdapter(BaseVLMAdapter):
                     parsed[key] = val
             return parsed
 
-    def _emulate_extraction(self, file_path: str) -> dict:
-        # Determine basic fields from file name
+    def _success_response(self, data: dict) -> dict:
+        return {
+            "ok": True,
+            "degraded": False,
+            "engine": "glm-ocr",
+            "warnings": [],
+            "data": data
+        }
+
+    def _infer_doc_type_from_name(self, file_path: str) -> str:
         base_name = os.path.basename(file_path).upper()
         doc_type = "PASSPORT"
         if "VISA" in base_name:
@@ -162,14 +177,23 @@ class GLMOCRAdapter(BaseVLMAdapter):
             doc_type = "EMIRATES_ID"
         elif "LABOR" in base_name or "LABOUR" in base_name:
             doc_type = "LABOR_CARD"
+        return doc_type
 
+    def _manual_review_required(self, file_path: str, reason: str) -> dict:
         return {
-            "first_name": "JOHN",
-            "last_name": "SMITH",
-            "doc_type": doc_type,
-            "doc_number": "A1234567",
-            "expiry_date": "2030-12-31",
-            "confidence_score": 95,
-            "phone_number": "+971501234567",
-            "notes": "Extracted via CPU local emulator fallback."
+            "ok": False,
+            "degraded": True,
+            "engine": "glm-ocr",
+            "warnings": [reason],
+            "data": {
+                "first_name": "",
+                "last_name": "",
+                "doc_type": self._infer_doc_type_from_name(file_path),
+                "doc_number": "",
+                "expiry_date": "",
+                "confidence_score": 0,
+                "phone_number": "",
+                "notes": reason,
+                "review_status": "Manual Review Required"
+            }
         }

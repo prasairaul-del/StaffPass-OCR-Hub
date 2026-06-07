@@ -1,11 +1,10 @@
 {
   "name": "staffpass-ocr-hub",
   "version": "1.4.0",
-
   "type": "commonjs",
   "author": "StaffPass",
   "license": "MIT",
-  "description": "StaffPass Local OCR Hub — process staff ID and pass documents with AI-powered OCR",
+  "description": "StaffPass Local OCR Hub - process staff ID and pass documents with AI-powered OCR",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -13,18 +12,29 @@
     "download-model": "python sidecar/download_model.py",
     "prepare": "husky",
     "rebuild": "electron-builder install-app-deps",
-    "dist": "npm run rebuild && electron-builder --win",
-    "dist:dir": "npm run rebuild && electron-builder --win --dir"
+    "check-signing": "node scripts/check-signing.js",
+    "validate:release-config": "node scripts/validate-release.js --mode config",
+    "validate:release": "node scripts/validate-release.js --mode release",
+    "validate:smoke": "node scripts/validate-release.js --mode smoke",
+    "dist:smoke": "npm run rebuild && electron-builder --win --dir",
+    "dist:installer:unsigned": "npm run rebuild && electron-builder --win --publish never -c.win.signAndEditExecutable=false",
+    "dist:release": "npm run check-signing && npm run rebuild && electron-builder --win",
+    "dist": "npm run dist:release",
+    "dist:dir": "npm run dist:smoke"
   },
   "dependencies": {
     "better-sqlite3": "^12.10.0",
-    "electron-updater": "^6.8.3"
+    "electron-updater": "^6.8.9"
   },
   "devDependencies": {
-    "electron": "^30.5.1",
-    "electron-builder": "^25.1.8",
+    "electron": "^40.9.3",
+    "electron-builder": "^26.15.0",
     "husky": "^9.1.7",
-    "mocha": "^10.4.0"
+    "mocha": "^11.7.6"
+  },
+  "overrides": {
+    "diff": "^9.0.0",
+    "serialize-javascript": "^7.0.5"
   },
   "build": {
     "appId": "com.staffpass.ocr-hub",
@@ -69,7 +79,8 @@
     "publish": {
       "provider": "github",
       "owner": "prasairaul-del",
-      "repo": "StaffPass-OCR-Hub"
+      "repo": "StaffPass-OCR-Hub",
+      "releaseType": "draft"
     },
     "nsis": {
       "oneClick": false,
@@ -85,6 +96,7 @@
   },
   "allowScripts": {
     "better-sqlite3@12.10.0": true,
-    "electron@30.5.1": true
+    "electron@40.9.3": true,
+    "electron-winstaller@5.4.0": true
   }
 }

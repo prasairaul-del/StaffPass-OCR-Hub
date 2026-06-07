@@ -2,10 +2,10 @@
 
 [![Version](https://img.shields.io/badge/version-1.4.0-blue.svg)](https://github.com/prasairaul-del/StaffPass-OCR-Hub/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](#license)
-[![Electron](https://img.shields.io/badge/Electron-30-9feaf9.svg)](https://www.electronjs.org/)
+[![Electron](https://img.shields.io/badge/Electron-40.9.3-9feaf9.svg)](https://www.electronjs.org/)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-blue.svg)](#installation)
 
-> A fully offline desktop application for processing staff ID and pass documents with AI-powered OCR. Built with Electron, SQLite, and a Python OCR sidecar.
+> A local-first desktop application for processing staff ID and pass documents with AI-powered OCR. Runtime document processing stays on the machine; optional model downloads and GitHub release checks use the network only when enabled by the operator.
 
 <!-- Add a PNG or SVG logo image here for GitHub rendering -->
 
@@ -201,7 +201,7 @@ npm start
 
 | Layer | Technology |
 |-------|-----------|
-| Desktop framework | [Electron](https://www.electronjs.org/) v30 |
+| Desktop framework | [Electron](https://www.electronjs.org/) v40.9.3 |
 | UI | Vanilla HTML/CSS/JS (no framework) |
 | Database | [SQLite](https://www.sqlite.org/) via [better-sqlite3](https://github.com/WiseLibs/better-sqlite3) |
 | OCR sidecar | Python 3.10+ |
@@ -293,14 +293,30 @@ python -m pytest tests/
 ### Windows Installer
 
 ```bash
-# Build NSIS installer (requires Developer Mode for icon embedding)
-npm run dist
+# Build an unsigned unpacked app for local smoke testing
+npm run dist:smoke
 
-# Build unpacked directory (for testing)
-npm run dist:dir
+# Build an unsigned local NSIS installer for test installs only
+npm run dist:installer:unsigned
+
+# Build the release installer when signing material is available
+npm run dist:release
+
+# Validate draft-release config without secrets
+npm run validate:release-config
+
+# Validate updater metadata and installer output
+npm run validate:release
 ```
 
 The output will be in the `dist_installer/` directory.
+
+Release states:
+
+1. `npm run dist:smoke` produces an unsigned `win-unpacked` directory for local verification only. It does not create an installer `.exe`.
+2. `npm run dist:installer:unsigned` produces an unsigned local NSIS installer `.exe` for test installs only. Do not publish it as a production release.
+3. `npm run dist:release` is the cert-ready guarded build. It requires the Windows signing environment before packaging the production installer.
+4. `npm run validate:release` is the production release check. It requires fresh updater metadata, matching `package.json` and `dist_installer/latest.yml` versions, and the referenced installer artifact to exist on disk.
 
 **Note:** Windows Developer Mode must be enabled for `electron-builder` to extract `winCodeSign` (required for embedding the custom icon into the `.exe`). Without it, the installer will use the default Electron icon.
 
@@ -311,6 +327,28 @@ If you change the Electron version or install new native dependencies:
 ```bash
 npm run rebuild
 ```
+
+For release or packaging runs, start from `npm ci` or another lockfile-respecting install so `better-sqlite3` and other native rebuilds stay reproducible from the committed `package-lock.json`.
+
+---
+
+## Electron Compatibility
+
+### Verified baseline
+- Electron `40.9.3` is the current verified release baseline for this repository.
+- The existing packaging and test flow is aligned to that baseline and should remain the reference point for release smoke checks.
+
+### Electron 42 compatibility wave
+- Electron `42` is out of scope for this pass.
+- The current blocker is native rebuild readiness for `better-sqlite3` on Windows, which depends on a working Visual Studio Build Tools and `node-gyp` toolchain.
+
+### Compatibility prerequisites
+- Visual Studio Build Tools installed and reachable from the shell.
+- `node-gyp` readiness confirmed before attempting native rebuilds.
+- `npm run rebuild` uses `electron-builder install-app-deps` to refresh native modules against the active Electron version.
+- `npm run dist:dir` passes as the local packaging smoke check.
+- App boot smoke passes on startup.
+- IPC tests pass before any compatibility claim is treated as verified.
 
 ---
 
@@ -331,8 +369,19 @@ The app uses `electron-updater` with GitHub Releases as the update source.
 # Bump version in package.json
 npm version patch  # or minor, major
 
-# Build the installer
-npm run dist
+# Smoke-test the packaged app without signing
+npm run dist:smoke
+
+# Optional: create an unsigned local installer for test installs only
+npm run dist:installer:unsigned
+
+# Require Windows signing material for release builds
+$env:STAFFPASS_REQUIRE_SIGNING = "1"
+npm run dist:release
+
+# Validate the draft release config and generated updater metadata
+npm run validate:release-config
+npm run validate:release
 
 # Tag and push
 git tag -a vX.Y.Z -m "vX.Y.Z: release notes"
@@ -343,7 +392,7 @@ gh release create vX.Y.Z "dist_installer/StaffPass OCR Hub Setup X.Y.Z.exe" \
   --title "vX.Y.Z: Title" --notes "Release notes here"
 ```
 
-**Important:** After building, update the `latest.yml` file in the release to reference the correct GitHub asset filename (GitHub replaces spaces with dots in asset names).
+**Important:** Production releases must be code-signed and regenerated from fresh updater metadata. Set `STAFFPASS_REQUIRE_SIGNING=1` with `CSC_LINK`/`WIN_CSC_LINK` or `CSC_NAME`/`WIN_CSC_NAME` before packaging the guarded release build. Use `validate:release-config` to check the draft-release GitHub settings without secrets, `validate:smoke` to confirm an unsigned smoke build is present, and `validate:release` to confirm the generated `latest.yml` stays aligned with the installer asset before publishing. The unsigned local installer is only for local installation testing and must not be attached to a public production release.
 
 ---
 
@@ -392,7 +441,7 @@ The OCR system uses a pluggable adapter pattern. The default development engine 
 The application includes a CPU-optimized adapter (`sidecar/glmocr_adapter.py`) designed specifically for **hardware-constrained systems** (e.g., computers with 8GB RAM, normal Intel i5 9th/10th generation processors, and no GPU).
 
 - **No GPU Needed:** Runs entirely on CPU using PyTorch and Hugging Face `transformers` (targeting the `zai-org/GLM-OCR` 0.9B parameter model).
-- **No External Services:** Does not require an Ollama service or internet access.
+- **No External OCR Service:** Does not require an Ollama service or cloud OCR API. Initial model download/cache setup may use Hugging Face/PyTorch package endpoints; cached runtime OCR remains local.
 - **CPU Throttling:** Restricts PyTorch thread counts dynamically to prevent interface lags and system freezes during inference.
 - **Image Downsampling Optimization:** Automatically resizes larger document scans to a maximum dimension of `512px` (preserving aspect ratio) before running OCR. This reduces the number of visual patches from 2,576 to at most 616, cutting memory overhead and accelerating CPU inference by over 16x (resolving process timeouts on standard desktop CPUs).
 
@@ -406,11 +455,12 @@ To ensure the desktop app remains lightweight:
 
 ## Security
 
-- **Context isolation** enabled — renderer cannot access Node.js APIs directly
-- **Hardened preload bridge** — only named IPC channels are exposed (no generic `send`/`invoke`/`on`)
-- **Content Security Policy** — inline scripts are blocked via SHA-256 hash allowlist
-- **Offline-first** — no external network calls, no telemetry, no analytics
-- **Local data only** — all documents and database records remain on the local machine
+- **Context isolation and renderer sandbox** enabled: renderer cannot access Node.js APIs directly
+- **Hardened preload bridge**: only named IPC channels are exposed; no generic `send`, `invoke`, or `on`
+- **IPC sender and file validation**: main-process handlers reject unknown senders, unsupported extensions, and missing document files
+- **Content Security Policy**: renderer scripts are restricted to local app assets
+- **Local data first**: documents and database records remain on the local machine; update checks and model downloads are explicit online operations
+- **Export privacy**: CSV exports omit source file paths and are created only through a save dialog
 
 ---
 

@@ -3,13 +3,13 @@
 ## Production Build Blueprint & Technical Roadmap
 
 Version: 1.0
-Status: Pre-Development Architecture Specification
+Status: Historical blueprint; current release-readiness baseline is Electron `40.9.3` with local-first runtime processing, real PDF preview, CSV export, DB validation/migrations, and cert-gated production release scripts.
 
 ---
 
 # Executive Summary
 
-StaffPass Local OCR Hub is a fully offline desktop application designed to automate the ingestion, extraction, validation, archiving, and indexing of staff identification documents including:
+StaffPass Local OCR Hub is a local-first desktop application designed to automate the ingestion, extraction, validation, archiving, and indexing of staff identification documents including:
 
 * Passports
 * Emirates IDs
@@ -17,11 +17,11 @@ StaffPass Local OCR Hub is a fully offline desktop application designed to autom
 * Labor Cards
 * Other accreditation documents
 
-The application is intended for Windows 10 and Windows 11 environments and must operate without cloud services, internet connectivity, telemetry, or background daemon dependencies.
+The application is intended for Windows 10 and Windows 11 environments. Runtime document processing stays local with no cloud OCR, telemetry, analytics, or background daemon dependency. Optional model downloads and GitHub update checks may use the network when enabled by the operator.
 
 Primary goals:
 
-* 100% Offline Operation
+* Local-First Runtime Operation
 * Low Resource Consumption
 * Privacy-First Design
 * Future-Proof OCR Engine
@@ -49,7 +49,7 @@ The application should become a local document processing hub capable of:
 
 ## Privacy First
 
-No external API calls.
+No external OCR API calls.
 
 No cloud OCR.
 
@@ -63,7 +63,7 @@ No Docker dependencies.
 
 No Ollama service requirements.
 
-All processing remains local.
+Document processing remains local. Release update checks and model-download setup are treated as explicit online operations, not runtime OCR dependencies.
 
 ---
 

@@ -36,15 +36,34 @@ function validateReviewData(data) {
 }
 
 function normalizeExtraction(result = {}) {
+  const structured = result && typeof result === 'object' && Object.prototype.hasOwnProperty.call(result, 'data');
+  const data = structured ? (result.data || {}) : result;
   return {
-    first_name: result.first_name || '',
-    last_name: result.last_name || '',
-    doc_type: result.doc_type || '',
-    doc_number: result.doc_number || '',
-    expiry_date: result.expiry_date || '',
-    phone_number: result.phone_number || '',
-    confidence_score: Number(result.confidence_score || result.confidence || 0)
+    first_name: data.first_name || '',
+    last_name: data.last_name || '',
+    doc_type: data.doc_type || '',
+    doc_number: data.doc_number || '',
+    expiry_date: data.expiry_date || '',
+    phone_number: data.phone_number || '',
+    confidence_score: Number(data.confidence_score || data.confidence || 0),
+    notes: data.notes || '',
+    ok: structured ? Boolean(result.ok) : true,
+    degraded: structured ? Boolean(result.degraded) : false,
+    engine: structured ? (result.engine || 'unknown') : 'legacy',
+    warnings: structured && Array.isArray(result.warnings) ? result.warnings : []
   };
+}
+
+function getReviewStatusForExtraction(extraction) {
+  if (extraction && extraction.degraded) return 'Manual Review Required';
+  return getConfidenceStatus(extraction?.confidence_score || 0);
+}
+
+function getExtractionNotes(extraction) {
+  if (!extraction) return '';
+  const warnings = Array.isArray(extraction.warnings) ? extraction.warnings.filter(Boolean) : [];
+  if (warnings.length > 0) return warnings.join(' ');
+  return extraction.notes || '';
 }
 
 function createQueueItem(filePath, fileSize = null) {
@@ -67,6 +86,32 @@ function createQueueItem(filePath, fileSize = null) {
     extraction: null,
     error: null
   };
+}
+
+function getOverlayFocusableElements(overlay) {
+  if (!overlay || !overlay.querySelectorAll) return [];
+  return Array.from(overlay.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'))
+    .filter((element) => !element.disabled && element.offsetParent !== null);
+}
+
+function restorePreviouslyFocusedElement() {
+  if (previouslyFocusedElement && typeof previouslyFocusedElement.focus === 'function') {
+    previouslyFocusedElement.focus();
+  }
+  previouslyFocusedElement = null;
+}
+
+function focusOverlayTarget(overlay, preferredSelector = null) {
+  if (!overlay) return;
+  const preferred = preferredSelector ? overlay.querySelector(preferredSelector) : null;
+  if (preferred && typeof preferred.focus === 'function') {
+    preferred.focus();
+    return;
+  }
+  const focusable = getOverlayFocusableElements(overlay);
+  if (focusable.length > 0 && typeof focusable[0].focus === 'function') {
+    focusable[0].focus();
+  }
 }
 
 function query(id) {
@@ -189,11 +234,7 @@ function renderIngestionQueue() {
     const actionsCell = document.createElement('td');
     const removeBtn = document.createElement('button');
     removeBtn.type = 'button';
-    removeBtn.className = 'tool-button';
-    removeBtn.style.color = 'var(--status-rejected, #e06c75)';
-    removeBtn.style.border = '1px solid var(--status-rejected, #e06c75)';
-    removeBtn.style.minHeight = '28px';
-    removeBtn.style.padding = '0 8px';
+    removeBtn.className = 'tool-button queue-remove-button';
     removeBtn.textContent = 'Remove';
     removeBtn.addEventListener('click', () => removeIngestedFile(item.id));
     actionsCell.appendChild(removeBtn);
@@ -207,10 +248,18 @@ async function updateDocumentPreview(item) {
   const containers = [query('document-preview-container'), query('review-preview-container')].filter(Boolean);
   if (containers.length === 0) return;
 
-  if (!item) {
-    containers.forEach(c => {
-      c.innerHTML = '<span style="color: var(--muted, #666);">No document selected</span>';
+  const setMessage = (message, className = '') => {
+    containers.forEach((container) => {
+      container.innerHTML = '';
+      const span = document.createElement('span');
+      span.className = className;
+      span.textContent = message;
+      container.appendChild(span);
     });
+  };
+
+  if (!item) {
+    setMessage('No document selected', 'preview-muted');
     return;
   }
 
@@ -219,15 +268,18 @@ async function updateDocumentPreview(item) {
   const isPdf = ext === 'pdf';
 
   if (isImage) {
-    containers.forEach(c => {
-      c.innerHTML = '<span style="color: var(--muted, #666);">Loading preview...</span>';
-    });
+    setMessage('Loading preview...', 'preview-muted');
     try {
       if (window.api && window.api.readAsBase64) {
         const base64Data = await window.api.readAsBase64(item.filePath);
         if (base64Data) {
-          containers.forEach(c => {
-            c.innerHTML = `<img src="${base64Data}" alt="${item.fileName}" style="max-width: 100%; max-height: 100%; object-fit: contain; border-radius: var(--radius);">`;
+          containers.forEach((container) => {
+            container.innerHTML = '';
+            const image = document.createElement('img');
+            image.src = base64Data;
+            image.alt = item.fileName;
+            image.className = 'document-preview-image';
+            container.appendChild(image);
           });
           return;
         }
@@ -235,23 +287,38 @@ async function updateDocumentPreview(item) {
     } catch (err) {
       console.error(err);
     }
-    containers.forEach(c => {
-      c.innerHTML = `<span style="color: var(--status-rejected, #e06c75);">Failed to load preview</span>`;
-    });
+    setMessage('Failed to load preview', 'preview-error');
   } else if (isPdf) {
-    containers.forEach(c => {
-      c.innerHTML = `
-        <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; text-align: center; color: var(--text);">
-          <span style="font-size: 2.5rem; line-height: 1;">📄</span>
-          <strong style="font-size: 0.9rem;">PDF Mock Preview Frame</strong>
-          <span style="font-size: 0.75rem; color: var(--muted); max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${item.fileName}</span>
-        </div>
-      `;
-    });
+    setMessage('Loading preview...', 'preview-muted');
+    try {
+      if (window.api && window.api.previewPdfPage) {
+        const preview = await window.api.previewPdfPage(item.filePath);
+        if (preview && preview.ok && preview.data) {
+          containers.forEach((container) => {
+            container.innerHTML = '';
+            const image = document.createElement('img');
+            image.src = `data:${preview.mimeType || 'image/png'};base64,${preview.data}`;
+            image.alt = item.fileName;
+            image.className = 'document-preview-image';
+            if (preview.width) image.width = preview.width;
+            if (preview.height) image.height = preview.height;
+            container.appendChild(image);
+          });
+          return;
+        }
+
+        const warning = Array.isArray(preview?.warnings) ? preview.warnings.filter(Boolean)[0] : '';
+        if (warning) {
+          setMessage(warning, 'preview-error');
+          return;
+        }
+      }
+    } catch (err) {
+      console.error(err);
+    }
+    setMessage('Failed to load preview', 'preview-error');
   } else {
-    containers.forEach(c => {
-      c.innerHTML = `<span style="color: var(--muted, #666);">No preview available for this format</span>`;
-    });
+    setMessage('No preview available for this format', 'preview-muted');
   }
 }
 
@@ -284,7 +351,7 @@ async function processBatchOCR() {
   const batchProgressBar = query('batch-progress-bar');
   const batchProgressText = query('batch-progress-text');
 
-  if (batchContainer) batchContainer.style.display = 'block';
+  if (batchContainer) batchContainer.classList.add('batch-progress-container', 'is-visible');
 
   const stepPrep = query('step-preparing');
   const stepRun = query('step-running');
@@ -295,14 +362,13 @@ async function processBatchOCR() {
     stepEl.className = 'checklist-step';
     const icon = stepEl.querySelector('.step-icon');
     if (stepState === 'pending') {
-      stepEl.style.color = 'var(--muted)';
-      if (icon) icon.textContent = '○';
+      if (icon) icon.textContent = 'o';
     } else if (stepState === 'active') {
-      stepEl.classList.add('step-active');
-      if (icon) icon.textContent = '●';
+      stepEl.classList.add('is-active');
+      if (icon) icon.textContent = '*';
     } else if (stepState === 'completed') {
-      stepEl.classList.add('step-completed');
-      if (icon) icon.textContent = '✓';
+      stepEl.classList.add('is-completed');
+      if (icon) icon.textContent = 'v';
     }
   };
 
@@ -338,7 +404,11 @@ async function processBatchOCR() {
       const rawResult = await window.api.processOCR(item.filePath);
       item.extraction = normalizeExtraction(rawResult);
       item.status = 'review';
-      item.reviewStatus = getConfidenceStatus(item.extraction.confidence_score);
+      item.reviewStatus = getReviewStatusForExtraction(item.extraction);
+      item.notes = getExtractionNotes(item.extraction);
+      if (item.extraction.degraded) {
+        setStatus(item.notes || 'OCR degraded. Manual review is required.', 'error');
+      }
 
       // Step 3: Saving
       updateStep(stepRun, 'completed');
@@ -368,7 +438,7 @@ async function processBatchOCR() {
   render();
 
   setTimeout(() => {
-    if (batchContainer) batchContainer.style.display = 'none';
+    if (batchContainer) batchContainer.classList.remove('is-visible');
   }, 3000);
 }
 
@@ -438,25 +508,25 @@ function displayInlineWarnings(errors) {
   const warnings = ['first-name', 'last-name', 'id-number', 'doc-type', 'expiry-date'];
   warnings.forEach(w => {
     const el = query(`warn-${w}`);
-    if (el) el.style.display = 'none';
+    if (el) el.classList.remove('is-visible');
   });
 
   errors.forEach(err => {
     if (err.includes('First name')) {
       const el = query('warn-first-name');
-      if (el) el.style.display = 'block';
+      if (el) el.classList.add('is-visible');
     } else if (err.includes('Last name')) {
       const el = query('warn-last-name');
-      if (el) el.style.display = 'block';
+      if (el) el.classList.add('is-visible');
     } else if (err.includes('Document number')) {
       const el = query('warn-id-number');
-      if (el) el.style.display = 'block';
+      if (el) el.classList.add('is-visible');
     } else if (err.includes('Document type')) {
       const el = query('warn-doc-type');
-      if (el) el.style.display = 'block';
+      if (el) el.classList.add('is-visible');
     } else if (err.includes('Expiry date') || err.includes('date format')) {
       const el = query('warn-expiry-date');
-      if (el) el.style.display = 'block';
+      if (el) el.classList.add('is-visible');
     }
   });
 }
@@ -514,6 +584,52 @@ async function saveSelectedReview(reviewStatus) {
 async function loadRecords() {
   if (!window.api || !window.api.listRecords) return;
   state.records = await window.api.listRecords();
+}
+
+function escapeCsvValue(value) {
+  const textValue = value == null ? '' : String(value);
+  if (/[",\r\n]/.test(textValue)) {
+    return `"${textValue.replace(/"/g, '""')}"`;
+  }
+  return textValue;
+}
+
+function recordsToCsv(records) {
+  const columns = [
+    ['first_name', 'First Name'],
+    ['last_name', 'Last Name'],
+    ['phone_number', 'Phone Number'],
+    ['doc_type', 'Document Type'],
+    ['doc_number', 'Document Number'],
+    ['expiry_date', 'Expiry Date'],
+    ['confidence_score', 'Confidence Score'],
+    ['review_status', 'Review Status'],
+    ['notes', 'Notes'],
+    ['uploaded_at', 'Uploaded At']
+  ];
+  const rows = [columns.map(([, heading]) => heading)];
+  (records || []).forEach((record) => {
+    rows.push(columns.map(([key]) => record[key]));
+  });
+  return rows.map((row) => row.map(escapeCsvValue).join(',')).join('\r\n');
+}
+
+async function exportRecords() {
+  if (!window.api || !window.api.exportRecords) {
+    setStatus('Export is unavailable.', 'error');
+    return;
+  }
+
+  try {
+    const result = await window.api.exportRecords({ format: 'csv' });
+    if (result && result.canceled) {
+      setStatus('Export canceled.');
+      return;
+    }
+    setStatus(`Exported ${result.rowCount || 0} record${result.rowCount === 1 ? '' : 's'} to CSV.`, 'success');
+  } catch (error) {
+    setStatus(error.message || 'Could not export records.', 'error');
+  }
 }
 
 function renderMetrics() {
@@ -582,6 +698,7 @@ function renderSelected() {
   text('review-status', item ? item.reviewStatus : 'Waiting');
 
   const notes = item?.error
+    || getExtractionNotes(item?.extraction)
     || (item?.extraction ? 'OCR output loaded. Review editable fields before saving.' : 'Select a queued document to view extraction notes and review guidance.');
   text('document-notes', notes);
 
@@ -602,14 +719,14 @@ function renderSelected() {
 
   const notesEl = query('correction-notes');
   if (notesEl) {
-    notesEl.value = item?.notes || '';
+    notesEl.value = item?.notes || getExtractionNotes(item?.extraction);
   }
 
   // Clear inline warnings
   const warnings = ['first-name', 'last-name', 'id-number', 'doc-type', 'expiry-date'];
   warnings.forEach(w => {
     const el = query(`warn-${w}`);
-    if (el) el.style.display = 'none';
+    if (el) el.classList.remove('is-visible');
   });
 
   setValidationErrors([]);
@@ -685,7 +802,6 @@ function bindEvents() {
   query('tab-review-queue')?.addEventListener('click', () => setActiveView('review'));
   query('tab-records')?.addEventListener('click', () => setActiveView('records'));
   query('process-selected')?.addEventListener('click', processSelectedOCR);
-  query('download-model-btn')?.addEventListener('click', downloadModel);
   query('clear-queue-btn')?.addEventListener('click', () => {
     state.queue = [];
     state.selectedId = null;
@@ -702,9 +818,7 @@ function bindEvents() {
     render();
     setStatus('Records refreshed.');
   });
-  query('export-records-btn')?.addEventListener('click', () => {
-    setStatus('Export is not part of the MVP workflow yet.');
-  });
+  query('export-records-btn')?.addEventListener('click', exportRecords);
   query('approve-btn')?.addEventListener('click', () => saveSelectedReview('Approved'));
   query('reject-btn')?.addEventListener('click', () => saveSelectedReview('Rejected'));
   query('correct-btn')?.addEventListener('click', () => saveSelectedReview('Corrected'));
@@ -777,12 +891,10 @@ function toggleShortcutsOverlay() {
   if (isHidden) {
     previouslyFocusedElement = document.activeElement;
     overlay.setAttribute('aria-hidden', 'false');
-    query('shortcuts-close')?.focus();
+    focusOverlayTarget(overlay, '#shortcuts-close');
   } else {
     overlay.setAttribute('aria-hidden', 'true');
-    if (previouslyFocusedElement && previouslyFocusedElement.focus) {
-      previouslyFocusedElement.focus();
-    }
+    restorePreviouslyFocusedElement();
   }
 }
 
@@ -877,16 +989,56 @@ function showWhatsNewDialog(version, sections) {
 
   overlay.setAttribute('aria-hidden', 'false');
   previouslyFocusedElement = document.activeElement;
-  query('whats-new-close')?.focus();
+  focusOverlayTarget(overlay, '#whats-new-close');
 }
 
 function dismissWhatsNew() {
   const overlay = query('whats-new-overlay');
   if (!overlay) return;
   overlay.setAttribute('aria-hidden', 'true');
-  if (previouslyFocusedElement && previouslyFocusedElement.focus) {
-    previouslyFocusedElement.focus();
+  restorePreviouslyFocusedElement();
+}
+
+function keepFocusInsideOverlay(event, overlayId) {
+  if (event.key !== 'Tab') return false;
+  const overlay = query(overlayId);
+  if (!overlay || overlay.getAttribute('aria-hidden') !== 'false') return false;
+
+  const focusable = getOverlayFocusableElements(overlay);
+  if (focusable.length === 0) return false;
+
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  const activeElement = document.activeElement;
+  const focusIsInsideOverlay = typeof overlay.contains === 'function'
+    ? overlay.contains(activeElement)
+    : activeElement === first || activeElement === last;
+
+  if (!focusIsInsideOverlay) {
+    event.preventDefault();
+    (event.shiftKey ? last : first).focus();
+    return true;
   }
+
+  if (event.shiftKey && activeElement === first) {
+    event.preventDefault();
+    last.focus();
+    return true;
+  }
+  if (!event.shiftKey && activeElement === last) {
+    event.preventDefault();
+    first.focus();
+    return true;
+  }
+  return false;
+}
+
+function enforceOverlayFocus(event) {
+  const overlayIds = ['whats-new-overlay', 'shortcuts-overlay'];
+  const activeOverlay = overlayIds.map(query).find((overlay) => overlay && overlay.getAttribute('aria-hidden') === 'false');
+  if (!activeOverlay) return;
+  if (typeof activeOverlay.contains === 'function' && activeOverlay.contains(event.target)) return;
+  focusOverlayTarget(activeOverlay);
 }
 
 function saveSeenVersion(version) {
@@ -924,7 +1076,7 @@ function setupAutoUpdateUI() {
         showToast('Checking for updates...');
         break;
       case 'available':
-        showToast(`Update v${status.version} available — downloading...`);
+        showToast(`Update v${status.version} available - downloading...`);
         break;
       case 'downloading':
         showToast(`Downloading update... ${status.percent}%`);
@@ -933,10 +1085,10 @@ function setupAutoUpdateUI() {
         showUpdateReadyBanner(status.version);
         break;
       case 'not-available':
-        // Silently ignore — no need to notify user they're up to date
+        // Silently ignore - no need to notify the user they're up to date
         break;
       case 'error':
-        // Silently ignore — updater errors are logged in main process
+        // Silently ignore - updater errors are logged in the main process
         break;
     }
   });
@@ -972,7 +1124,7 @@ function showUpdateReadyBanner(version) {
   const dismissBtn = document.createElement('button');
   dismissBtn.type = 'button';
   dismissBtn.className = 'update-banner-dismiss';
-  dismissBtn.textContent = '×';
+  dismissBtn.textContent = 'x';
   dismissBtn.setAttribute('aria-label', 'Dismiss update notification');
   dismissBtn.addEventListener('click', () => {
     banner.remove();
@@ -1000,7 +1152,7 @@ function setupModelDownloadUI() {
     btn.disabled = true;
     btn.textContent = 'Downloading...';
     if (statusEl) statusEl.textContent = 'Starting download...';
-    if (progressContainer) progressContainer.style.display = 'block';
+    if (progressContainer) progressContainer.classList.add('is-visible');
     if (progressBar) progressBar.value = 0;
     if (progressDetail) progressDetail.textContent = '0% (Connecting...)';
     showToast('Starting OCR Model download...');
@@ -1010,7 +1162,7 @@ function setupModelDownloadUI() {
       btn.textContent = 'Download OCR Model';
       btn.disabled = false;
       if (statusEl) statusEl.textContent = 'Ready (Cached)';
-      if (progressContainer) progressContainer.style.display = 'none';
+      if (progressContainer) progressContainer.classList.remove('is-visible');
       showToast('OCR Model cached successfully!');
     } catch (error) {
       btn.textContent = 'Download OCR Model';
@@ -1071,6 +1223,9 @@ async function init() {
   });
 
   document.addEventListener('keydown', (event) => {
+    if (keepFocusInsideOverlay(event, 'whats-new-overlay') || keepFocusInsideOverlay(event, 'shortcuts-overlay')) {
+      return;
+    }
     if (event.ctrlKey && event.shiftKey && event.key === 'D') {
       event.preventDefault();
       toggleTheme();
@@ -1125,6 +1280,7 @@ async function init() {
       }
     }
   });
+  document.addEventListener('focusin', enforceOverlayFocus);
   query('check-updates-btn')?.addEventListener('click', checkForUpdates);
   bindEvents();
   setActiveView('ingestion');
@@ -1139,8 +1295,12 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
 if (typeof module !== 'undefined') {
   module.exports = {
     createQueueItem,
+    escapeCsvValue,
     getConfidenceStatus,
+    getExtractionNotes,
+    getReviewStatusForExtraction,
     normalizeExtraction,
+    recordsToCsv,
     validateReviewData
   };
 }

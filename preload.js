@@ -11,9 +11,11 @@ function createSafeListener(channel, callback) {
 contextBridge.exposeInMainWorld('api', {
   selectDocuments: () => ipcRenderer.invoke('documents:select'),
   readAsBase64: (filePath) => ipcRenderer.invoke('documents:readAsBase64', filePath),
+  previewPdfPage: (filePath) => ipcRenderer.invoke('documents:previewPdfPage', filePath),
   processOCR: (filePath) => ipcRenderer.invoke('ocr:process', filePath),
   saveReview: (payload) => ipcRenderer.invoke('review:save', payload),
   listRecords: () => ipcRenderer.invoke('records:list'),
+  exportRecords: (options) => ipcRenderer.invoke('records:export', options),
   getVersion: () => ipcRenderer.invoke('app:getVersion'),
   fetchReleaseNotes: (version) => ipcRenderer.invoke('release-notes:get', version),
 

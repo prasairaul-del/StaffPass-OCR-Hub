@@ -1,12 +1,17 @@
 const { app, BrowserWindow, dialog, ipcMain } = require('electron');
+const fs = require('fs');
 const path = require('path');
 const https = require('https');
+const { fileURLToPath } = require('url');
 const { autoUpdater } = require('electron-updater');
 const bridge = require('./sidecar_bridge');
 const db = require('./database');
 
 let ipcRegistered = false;
 let mainWindow = null;
+const DOCUMENT_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.pdf', '.tif', '.tiff', '.webp']);
+const PDF_EXTENSIONS = new Set(['.pdf']);
+const PREVIEW_IMAGE_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.tif', '.tiff']);
 
 function createWindow() {
   console.log('[DEBUG] createWindow: creating BrowserWindow...');
@@ -16,7 +21,8 @@ function createWindow() {
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+      sandbox: true
     }
   });
 
@@ -38,8 +44,9 @@ function createWindow() {
       console.log(`[RENDERER CONSOLE] [Level ${level}] ${message} (at ${sourceId}:${line})`);
     });
 
-    // Open the DevTools to inspect renderer console
-    mainWindow.webContents.openDevTools();
+    if (!app.isPackaged && process.env.STAFFPASS_OPEN_DEVTOOLS === '1') {
+      mainWindow.webContents.openDevTools({ mode: 'detach' });
+    }
   }
 
   console.log('[DEBUG] loadFile index.html...');
@@ -47,37 +54,129 @@ function createWindow() {
   return mainWindow;
 }
 
+function getSenderUrl(event) {
+  if (event && event.senderFrame && event.senderFrame.url) return event.senderFrame.url;
+  if (event && event.sender && event.sender.getURL) return event.sender.getURL();
+  return '';
+}
 
+function assertTrustedSender(event) {
+  const senderUrl = getSenderUrl(event);
+  if (!senderUrl) throw new Error('Blocked IPC request from unknown sender.');
+
+  let parsed;
+  try {
+    parsed = new URL(senderUrl);
+  } catch (_err) {
+    throw new Error('Blocked IPC request from invalid sender.');
+  }
+
+  if (parsed.protocol !== 'file:') {
+    throw new Error('Blocked IPC request from untrusted sender.');
+  }
+
+  let senderPath;
+  try {
+    senderPath = path.normalize(fileURLToPath(parsed));
+  } catch (_err) {
+    throw new Error('Blocked IPC request from invalid sender.');
+  }
+
+  const expectedPath = path.normalize(path.join(__dirname, 'index.html'));
+  if (senderPath !== expectedPath) {
+    throw new Error('Blocked IPC request from untrusted sender.');
+  }
+}
+
+function assertAllowedDocumentPath(filePath, allowedExtensions) {
+  const normalizedPath = typeof filePath === 'string' ? path.normalize(filePath) : '';
+  const extension = path.extname(normalizedPath).toLowerCase();
+  const extensions = allowedExtensions || DOCUMENT_EXTENSIONS;
+
+  if (!normalizedPath || !path.isAbsolute(normalizedPath)) {
+    throw new Error('Document path must be absolute.');
+  }
+  if (!extensions.has(extension)) {
+    throw new Error('Document type is not supported.');
+  }
+  if (!fs.existsSync(normalizedPath)) {
+    throw new Error('Document file does not exist.');
+  }
+
+  return normalizedPath;
+}
+
+function getPreviewMimeType(filePath) {
+  const ext = path.extname(filePath).toLowerCase();
+  if (ext === '.png') return 'image/png';
+  if (ext === '.gif') return 'image/gif';
+  if (ext === '.bmp') return 'image/bmp';
+  if (ext === '.webp') return 'image/webp';
+  if (ext === '.tiff' || ext === '.tif') return 'image/tiff';
+  return 'image/jpeg';
+}
+
+function csvEscape(value) {
+  const textValue = value == null ? '' : String(value);
+  if (/[",\r\n]/.test(textValue)) {
+    return `"${textValue.replace(/"/g, '""')}"`;
+  }
+  return textValue;
+}
+
+function recordsToCsv(records) {
+  const columns = [
+    ['first_name', 'First Name'],
+    ['last_name', 'Last Name'],
+    ['phone_number', 'Phone Number'],
+    ['doc_type', 'Document Type'],
+    ['doc_number', 'Document Number'],
+    ['expiry_date', 'Expiry Date'],
+    ['confidence_score', 'Confidence Score'],
+    ['review_status', 'Review Status'],
+    ['notes', 'Notes'],
+    ['uploaded_at', 'Uploaded At']
+  ];
+  const rows = [columns.map(([, heading]) => heading)];
+  records.forEach((record) => {
+    rows.push(columns.map(([key]) => record[key]));
+  });
+  return rows.map((row) => row.map(csvEscape).join(',')).join('\r\n');
+}
 
 function registerIpcHandlers() {
   if (ipcRegistered) return;
 
-  ipcMain.handle('documents:select', async () => {
+  ipcMain.handle('documents:select', async (event) => {
+    assertTrustedSender(event);
     const result = await dialog.showOpenDialog({
       title: 'Select documents',
       properties: ['openFile', 'multiSelections'],
       filters: [
         {
           name: 'Documents',
-          extensions: ['jpg', 'jpeg', 'png', 'pdf']
+          extensions: ['jpg', 'jpeg', 'png', 'pdf', 'tif', 'tiff', 'webp']
         }
       ]
     });
 
-    return result.canceled ? [] : result.filePaths;
+    if (result.canceled) return [];
+    return result.filePaths.filter((filePath) => {
+      try {
+        assertAllowedDocumentPath(filePath, DOCUMENT_EXTENSIONS);
+        return true;
+      } catch (_err) {
+        return false;
+      }
+    });
   });
 
   ipcMain.handle('documents:readAsBase64', async (event, filePath) => {
-    const fs = require('fs');
+    assertTrustedSender(event);
+    const safePath = assertAllowedDocumentPath(filePath, PREVIEW_IMAGE_EXTENSIONS);
     try {
-      const data = fs.readFileSync(filePath);
-      const ext = path.extname(filePath).toLowerCase();
-      let mimeType = 'image/jpeg';
-      if (ext === '.png') mimeType = 'image/png';
-      else if (ext === '.gif') mimeType = 'image/gif';
-      else if (ext === '.bmp') mimeType = 'image/bmp';
-      else if (ext === '.webp') mimeType = 'image/webp';
-      else if (ext === '.tiff' || ext === '.tif') mimeType = 'image/tiff';
+      const data = fs.readFileSync(safePath);
+      const mimeType = getPreviewMimeType(safePath);
       return `data:${mimeType};base64,${data.toString('base64')}`;
     } catch (err) {
       console.error(err);
@@ -85,23 +184,60 @@ function registerIpcHandlers() {
     }
   });
 
+  ipcMain.handle('documents:previewPdfPage', async (event, filePath) => {
+    assertTrustedSender(event);
+    const safePath = assertAllowedDocumentPath(filePath, PDF_EXTENSIONS);
+    return bridge.previewPdfPage(safePath);
+  });
+
   ipcMain.handle('ocr:process', async (event, filePath) => {
-    return bridge.runOCR(filePath);
+    assertTrustedSender(event);
+    const safePath = assertAllowedDocumentPath(filePath, DOCUMENT_EXTENSIONS);
+    return bridge.runOCR(safePath);
   });
 
   ipcMain.handle('review:save', async (event, payload) => {
+    assertTrustedSender(event);
+    if (payload && payload.file_path) {
+      payload.file_path = assertAllowedDocumentPath(payload.file_path, DOCUMENT_EXTENSIONS);
+    }
     return db.saveReviewedDocument(payload);
   });
 
-  ipcMain.handle('records:list', async () => {
+  ipcMain.handle('records:list', async (event) => {
+    assertTrustedSender(event);
     return db.listRecords();
   });
 
-  ipcMain.handle('app:getVersion', () => {
+  ipcMain.handle('records:export', async (event) => {
+    assertTrustedSender(event);
+    const result = await dialog.showSaveDialog({
+      title: 'Export StaffPass records',
+      defaultPath: `staffpass-records-${new Date().toISOString().slice(0, 10)}.csv`,
+      filters: [{ name: 'CSV', extensions: ['csv'] }]
+    });
+
+    if (result.canceled || !result.filePath) {
+      return { ok: false, canceled: true, rowCount: 0 };
+    }
+
+    const targetPath = path.normalize(result.filePath);
+    if (path.extname(targetPath).toLowerCase() !== '.csv') {
+      throw new Error('Export target must be a CSV file.');
+    }
+
+    const records = db.listRecords();
+    fs.writeFileSync(targetPath, recordsToCsv(records), 'utf8');
+    return { ok: true, canceled: false, rowCount: records.length };
+  });
+
+  ipcMain.handle('app:getVersion', (event) => {
+    assertTrustedSender(event);
     return app.getVersion();
   });
 
   ipcMain.handle('release-notes:get', async (event, version) => {
+    assertTrustedSender(event);
     const owner = 'prasairaul-del';
     const repo = 'StaffPass-OCR-Hub';
     const url = `https://api.github.com/repos/${owner}/${repo}/releases/tags/v${version}`;
@@ -124,6 +260,7 @@ function registerIpcHandlers() {
   });
 
   ipcMain.handle('ocr:downloadModel', async (event) => {
+    assertTrustedSender(event);
     const webContents = event.sender;
     return bridge.downloadModel((status) => {
       if (webContents && !webContents.isDestroyed()) {
@@ -132,11 +269,13 @@ function registerIpcHandlers() {
     });
   });
 
-  ipcMain.on('updater:check', () => {
+  ipcMain.on('updater:check', (event) => {
+    assertTrustedSender(event);
     autoUpdater.checkForUpdates().catch(() => {});
   });
 
-  ipcMain.on('updater:install', () => {
+  ipcMain.on('updater:install', (event) => {
+    assertTrustedSender(event);
     autoUpdater.quitAndInstall(false, true);
   });
 
@@ -276,9 +415,11 @@ if (require.main === module || !module.parent) {
 }
 
 module.exports = {
+  assertAllowedDocumentPath,
+  assertTrustedSender,
   createWindow,
   registerIpcHandlers,
+  recordsToCsv,
   setupAutoUpdater,
   startApp
 };
-

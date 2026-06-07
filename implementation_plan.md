@@ -2,6 +2,22 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+## Current Status After Release-Readiness Pass
+
+This document preserves the original implementation plan for project history. The current application is now beyond the initial structure stage:
+
+- Electron is verified on `40.9.3` with sandboxed renderer settings, named preload APIs, IPC sender validation, and document path/extension validation.
+- OCR fallback responses use a degraded/manual-review shape instead of fabricated identity records.
+- CSV export is implemented for saved records with deterministic columns and no source file path leakage.
+- PDF preview uses Python-sidecar first-page rasterization through PyMuPDF instead of a mock preview frame.
+- SQLite persistence now includes runtime validation, migration metadata, and pre-migration `.bak` backups.
+- `package-lock.json` is part of the release source of truth for reproducible Electron/native-module builds.
+- Sensitive intake/export/archive files are ignored and must stay outside the repo; the private accreditation ZIP was quarantined outside the workspace.
+- `npm run dist:smoke` builds only an unsigned `win-unpacked` smoke directory.
+- `npm run dist:installer:unsigned` builds an unsigned local NSIS installer for test installs only.
+- `npm run dist:release` remains cert-gated for production signing, and `npm run validate:release` requires fresh signed updater metadata.
+- Electron 42 is intentionally deferred until Windows native rebuild tooling for `better-sqlite3` is verified.
+
 **Goal:** Initialize Electron boilerplate, configure SQLite schema, and create the Python OCR sidecar with BaseVLMAdapter to build the offline document ingestion pipeline.
 
 **Architecture:** Electron main process coordinates SQLite and spawns a Python subprocess (sidecar) for ML/OCR tasks. IPC bridge passes base64 images/PDFs or paths, returning structured JSON metadata.

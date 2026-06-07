@@ -29,11 +29,65 @@ function resolvePython() {
       const result = spawnSync(candidate, ['--version'], { stdio: 'ignore' });
       if (result.status === 0) return candidate;
     } catch {
-      // Not found — try next candidate
+      // Not found; try next candidate
     }
   }
 
   return 'python';
+}
+
+function runPythonJson(scriptArgs, code, timeoutMs = DEFAULT_TIMEOUT_MS, cwd = __dirname) {
+  return new Promise((resolve, reject) => {
+    const python = resolvePython();
+    const childProcess = spawn(python, ['-c', code, ...scriptArgs], {
+      stdio: ['ignore', 'pipe', 'pipe'],
+      env: { ...process.env },
+      cwd
+    });
+
+    let stdout = '';
+    let stderr = '';
+    const timeout = setTimeout(() => {
+      try {
+        childProcess.kill('SIGKILL');
+      } catch (_err) {}
+      reject(new Error(`PDF preview request timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+
+    childProcess.stdout.on('data', (chunk) => {
+      stdout += chunk.toString();
+    });
+
+    childProcess.stderr.on('data', (chunk) => {
+      stderr += chunk.toString();
+    });
+
+    childProcess.on('error', (error) => {
+      clearTimeout(timeout);
+      reject(error);
+    });
+
+    childProcess.on('exit', (code, signal) => {
+      clearTimeout(timeout);
+      if (code !== 0) {
+        const suffix = stderr.trim() ? `: ${stderr.trim()}` : '';
+        reject(new Error(`PDF preview sidecar exited with code ${code ?? 'null'} and signal ${signal ?? 'null'}${suffix}`));
+        return;
+      }
+
+      const output = stdout.trim();
+      if (!output) {
+        reject(new Error('PDF preview sidecar returned no data.'));
+        return;
+      }
+
+      try {
+        resolve(JSON.parse(output));
+      } catch (error) {
+        reject(error);
+      }
+    });
+  });
 }
 
 function startChild() {
@@ -94,13 +148,33 @@ function settleResponse(line, request) {
   try {
     const response = JSON.parse(line);
     if (response.status === 'success') {
-      request.resolve(response.data);
+      request.resolve(normalizeOcrResponse(response.data));
       return;
     }
     request.reject(new Error(response.message || 'OCR failed'));
   } catch (error) {
     request.reject(error);
   }
+}
+
+function normalizeOcrResponse(data) {
+  if (data && typeof data === 'object' && Object.prototype.hasOwnProperty.call(data, 'ok') && data.data) {
+    return {
+      ok: Boolean(data.ok),
+      degraded: Boolean(data.degraded),
+      engine: data.engine || 'unknown',
+      warnings: Array.isArray(data.warnings) ? data.warnings : [],
+      data: data.data || {}
+    };
+  }
+
+  return {
+    ok: true,
+    degraded: false,
+    engine: process.env.OCR_ENGINE || 'legacy',
+    warnings: [],
+    data: data || {}
+  };
 }
 
 function runOCR(filePath) {
@@ -195,4 +269,17 @@ function downloadModel(onProgress) {
   });
 }
 
-module.exports = { runOCR, stop, isRunning, downloadModel };
+function previewPdfPage(filePath) {
+  const code = [
+    'import json',
+    'import sys',
+    'from pdf_preview import render_first_page_pdf_preview',
+    '',
+    'result = render_first_page_pdf_preview(sys.argv[1])',
+    'print(json.dumps(result))'
+  ].join('\n');
+
+  return runPythonJson([filePath], code, Number(process.env.PDF_PREVIEW_TIMEOUT_MS || DEFAULT_TIMEOUT_MS), getSidecarDir());
+}
+
+module.exports = { runOCR, stop, isRunning, downloadModel, previewPdfPage, normalizeOcrResponse };
