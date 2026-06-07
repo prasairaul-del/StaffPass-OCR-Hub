@@ -17,6 +17,8 @@ This document preserves the original implementation plan for project history. Th
 - `npm run dist:installer:unsigned` builds an unsigned local NSIS installer for test installs only.
 - `npm run dist:release` remains cert-gated for production signing, and `npm run validate:release` requires fresh signed updater metadata.
 - Electron 42 is intentionally deferred until Windows native rebuild tooling for `better-sqlite3` is verified.
+- A standalone Android Expo app now lives under `mobile/` with mobile-native capture/import, local `expo-sqlite` records, CSV sharing, EAS APK/AAB profiles, and degraded/manual-review-only OCR until a native Android OCR adapter is implemented.
+- Android APK generation is repo-ready but externally gated by one-time Expo project linking through `npx eas-cli@latest init`.
 
 **Goal:** Initialize Electron boilerplate, configure SQLite schema, and create the Python OCR sidecar with BaseVLMAdapter to build the offline document ingestion pipeline.
 

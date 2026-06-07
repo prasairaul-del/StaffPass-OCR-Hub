@@ -8,6 +8,16 @@ sidecar/__pycache__/
 sidecar/tests/__pycache__/
 *.pyc
 dist_installer/
+mobile/.expo/
+mobile/android/
+mobile/ios/
+mobile/build/
+mobile/dist/
+mobile/*.apk
+mobile/*.aab
+mobile/*.jks
+mobile/*.keystore
+mobile/credentials.json
 *.zip
 *.7z
 *.rar

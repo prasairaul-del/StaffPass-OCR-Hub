@@ -17,6 +17,7 @@
 - [Screenshots](#screenshots)
 - [Architecture](#architecture)
 - [Installation](#installation)
+- [Android Mobile App](#android-mobile-app)
 - [Usage](#usage)
 - [Keyboard Shortcuts](#keyboard-shortcuts)
 - [Tech Stack](#tech-stack)
@@ -175,6 +176,49 @@ npm start
 
 ---
 
+## Android Mobile App
+
+The repository includes a standalone Android Expo app under `mobile/`. It is a mobile-native local-first implementation, not an Electron wrapper.
+
+Current mobile behavior:
+- Captures documents with the Android camera or imports images/PDFs through Expo pickers.
+- Stores review records locally with `expo-sqlite`.
+- Exports records as CSV through the Android share/save flow.
+- Uses the same truthful OCR contract shape: `{ ok, degraded, data, warnings, engine }`.
+- Returns degraded/manual-review-only OCR output until a native Android OCR adapter is added.
+
+Mobile development:
+
+```bash
+cd mobile
+npm install
+npm run start
+npm run doctor
+npm run typecheck
+npm test
+```
+
+Android builds:
+
+```bash
+# From the repository root
+
+# One-time setup under your Expo account
+cd mobile
+npx eas-cli@latest init
+cd ..
+
+# Direct-install/internal tester APK
+npm run mobile:android:apk
+
+# Google Play-ready Android App Bundle profile
+npm run mobile:android:aab
+```
+
+APK builds are for direct install and internal testing. Google Play release should use the AAB profile. Expo/EAS can manage Android signing credentials, but keystores, service-account files, APKs, and AABs must stay untracked.
+
+---
+
 ## Usage
 
 ### 1. Ingest Documents
@@ -210,6 +254,15 @@ npm start
 | Testing | [Mocha](https://mochajs.org/) |
 | Git hooks | [Husky](https://typicode.github.io/husky/) |
 
+| Mobile layer | Technology |
+|--------------|------------|
+| Android framework | [Expo](https://expo.dev/) SDK 56 / React Native |
+| Mobile routing | Expo Router tabs + stack screens |
+| Mobile storage | `expo-sqlite` local records database |
+| Mobile document intake | `expo-image-picker` and `expo-document-picker` |
+| Mobile export | `expo-file-system` + `expo-sharing` |
+| Mobile packaging | EAS Build APK/AAB profiles |
+
 ---
 
 ## Project Structure
@@ -237,6 +290,7 @@ StaffPass-OCR-Hub/
 │   ├── requirements.txt     # Python dependencies
 │   └── tests/
 │       └── test_sidecar.py  # Python unit tests
+├── mobile/                  # Expo Android app
 └── tests/                   # JavaScript unit tests
     ├── electron.test.js     # Electron app wiring tests
     ├── database.test.js     # SQLite schema tests
@@ -284,6 +338,12 @@ npx mocha tests/database.test.js
 # Run Python sidecar tests
 cd sidecar
 python -m pytest tests/
+
+# Run mobile Expo checks
+cd ..
+npm run mobile:doctor
+npm run mobile:typecheck
+npm run mobile:test
 ```
 
 ---
@@ -319,6 +379,30 @@ Release states:
 4. `npm run validate:release` is the production release check. It requires fresh updater metadata, matching `package.json` and `dist_installer/latest.yml` versions, and the referenced installer artifact to exist on disk.
 
 **Note:** Windows Developer Mode must be enabled for `electron-builder` to extract `winCodeSign` (required for embedding the custom icon into the `.exe`). Without it, the installer will use the default Electron icon.
+
+### Android APK / AAB
+
+```bash
+# Validate Expo config and dependency versions
+npm run mobile:doctor
+
+# Typecheck and run mobile unit tests
+npm run mobile:typecheck
+npm run mobile:test
+
+# Build a direct-install Android APK through EAS
+npm run mobile:android:apk
+
+# Build an Android App Bundle for Google Play tracks
+npm run mobile:android:aab
+```
+
+The mobile APK is separate from the Windows installer and does not include Electron, `better-sqlite3`, or the Python sidecar. The first Android build uses a degraded manual-review OCR adapter until native Android OCR is implemented.
+
+Mobile build notes:
+- Run `npx eas-cli@latest init` inside `mobile/` before non-interactive APK/AAB builds.
+- The mobile scripts call `npx eas-cli@latest` to avoid stale global EAS CLI versions.
+- Expo SDK 56 expects Expo Router-managed navigation and the newer `expo-file-system` `File`/`Paths` API.
 
 ### Rebuild Native Modules
 
@@ -461,6 +545,7 @@ To ensure the desktop app remains lightweight:
 - **Content Security Policy**: renderer scripts are restricted to local app assets
 - **Local data first**: documents and database records remain on the local machine; update checks and model downloads are explicit online operations
 - **Export privacy**: CSV exports omit source file paths and are created only through a save dialog
+- **Mobile privacy**: Android records and imported files stay device-local; mobile CSV exports use the Android share/save flow and omit source file paths
 
 ---
 

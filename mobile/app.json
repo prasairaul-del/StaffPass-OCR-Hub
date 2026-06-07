@@ -1,0 +1,37 @@
+{
+  "expo": {
+    "name": "StaffPass OCR Hub",
+    "slug": "staffpass-ocr-hub-mobile",
+    "version": "1.4.0",
+    "orientation": "portrait",
+    "scheme": "staffpass",
+    "userInterfaceStyle": "automatic",
+    "android": {
+      "package": "com.staffpass.ocrhub.mobile",
+      "versionCode": 1,
+      "permissions": [
+        "CAMERA",
+        "READ_MEDIA_IMAGES"
+      ]
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Allow StaffPass OCR Hub to capture staff documents for local review.",
+          "photosPermission": "Allow StaffPass OCR Hub to import staff document images for local review."
+        }
+      ],
+      [
+        "expo-document-picker",
+        {
+          "iCloudContainerEnvironment": "Production"
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
