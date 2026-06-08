@@ -185,7 +185,7 @@ Current mobile behavior:
 - Stores review records locally with `expo-sqlite`.
 - Exports records as CSV through the Android share/save flow.
 - Uses the same truthful OCR contract shape: `{ ok, degraded, data, warnings, engine }`.
-- Returns degraded/manual-review-only OCR output until a native Android OCR adapter is added.
+- Native offline OCR is fully implemented using Google ML Kit Text Recognition with regex-based field parsing for Emirates IDs and Passports.
 
 Mobile development:
 
@@ -397,7 +397,7 @@ npm run mobile:android:apk
 npm run mobile:android:aab
 ```
 
-The mobile APK is separate from the Windows installer and does not include Electron, `better-sqlite3`, or the Python sidecar. The first Android build uses a degraded manual-review OCR adapter until native Android OCR is implemented.
+The mobile APK is separate from the Windows installer and does not include Electron, `better-sqlite3`, or the Python sidecar. It includes a fully-functional native offline Google ML Kit Text Recognition model for direct on-device OCR.
 
 Mobile build notes:
 - Run `npx eas-cli@latest init` inside `mobile/` before non-interactive APK/AAB builds.
@@ -575,6 +575,7 @@ See [CHANGELOG.md](CHANGELOG.md) for a detailed history of all releases.
 
 ### Recent Releases
 
+- **v1.4.0** — Ingestion tab batch checklist, side-by-side queue previews, real-time saved records search, local Inter/Outfit fonts packaging, zinc theme redesign, and standalone Android offline Google ML Kit OCR integration.
 - **v1.3.0** — Local CPU-optimized GLM-OCR integration, zero-memory idle state, strict lifecycle controls, and Node 26 compatibility runner
 - **v1.2.0** — Dynamic release notes fetched from GitHub Releases API
 - **v1.1.0** — Auto-updater with GitHub Releases, What's new dialog, version display

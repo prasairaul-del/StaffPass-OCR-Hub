@@ -6,7 +6,7 @@ Standalone Android implementation for StaffPass OCR Hub. It is a mobile-native E
 
 - Local-first Android app shell is implemented under `mobile/`.
 - Capture/import, review, local SQLite records, search, and CSV export are implemented.
-- OCR is intentionally degraded/manual-review-only until a native Android OCR adapter is added.
+- Native offline OCR is fully implemented using Google ML Kit Text Recognition with regex-based field parsing for Emirates IDs and Passports.
 - APK builds are for direct install/internal testing. Play Store release should use the AAB profile.
 
 ## Commands
@@ -37,3 +37,6 @@ Expo/EAS can manage Android signing credentials. Do not commit keystores, servic
 - Expo SDK 56 rejects direct `@react-navigation/*` dependencies alongside Expo Router; keep tab/stack navigation through `expo-router`.
 - Expo SDK 56 uses the new `expo-file-system` `File`/`Paths` API for CSV writes.
 - The `uuid` override keeps Expo build tooling clear of the current transitive audit advisory without forcing a breaking package downgrade.
+- Sideloaded APKs distributed outside the Play Store must package Google ML Kit dependencies using the Bundled version (`com.google.mlkit:text-recognition`) to avoid dynamic download failures on offline/air-gapped devices or devices lacking Google Play Services.
+- Decoupling native React Native dependencies from pure business logic helpers (like regex/heuristics parsing) enables 100% test coverage using standard Node.js test runners without requiring a native mobile environment compiler like Metro.
+- Skip React Native Directory architecture compatibility checks in `expo-doctor` by excluding specific libraries in `package.json`'s `expo.doctor.reactNativeDirectoryCheck.exclude` property.

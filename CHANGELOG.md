@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Bundled offline Google ML Kit Text Recognition for native Android OCR in the standalone mobile app shell (no Play Store or network dependency).
+- Decoupled OCR parsing logic into `ocr-parser.ts` to allow 100% test coverage with Node.js built-in test runner (`node:test`) and tsx compiling, with `8/8` passing test cases.
+- Configured EAS project linking and updated `package.json` to exclude react-native architecture validation warnings in `expo-doctor`.
+- Triggered and successfully compiled a new standalone preview APK (`v1.4.0`) via EAS build.
 - Standalone Expo Android app under `mobile/` with camera/gallery/document intake, local SQLite records, review screens, CSV sharing, and EAS APK/AAB profiles.
 - Mobile manual-review OCR adapter using the same `{ ok, degraded, data, warnings, engine }` truthfulness contract as the desktop app.
 - Root mobile helper scripts for Expo Doctor, typecheck, mobile tests, APK builds, and AAB builds.

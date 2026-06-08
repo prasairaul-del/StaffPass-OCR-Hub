@@ -10,8 +10,9 @@
       "package": "com.staffpass.ocrhub.mobile",
       "versionCode": 1,
       "permissions": [
-        "CAMERA",
-        "READ_MEDIA_IMAGES"
+        "android.permission.CAMERA",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.RECORD_AUDIO"
       ]
     },
     "plugins": [
@@ -32,6 +33,13 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "152a5cc5-b7ee-41cc-b73d-b73b2c992c97"
+      }
+    },
+    "owner": "raul99"
   }
 }
