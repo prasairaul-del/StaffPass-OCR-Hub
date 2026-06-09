@@ -1,5 +1,8 @@
 # Specification: Keyboard-Only Review Workflow
 
+**Date**: 2026-06-09
+**Status**: Implemented
+
 This specification details the design for a Keyboard-Only Review Workflow in the StaffPass OCR Hub desktop application. The goal is to maximize data-operator efficiency by eliminating the need for mouse interaction during manual review tasks.
 
 ---
