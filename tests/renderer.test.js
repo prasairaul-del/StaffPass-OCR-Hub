@@ -105,7 +105,10 @@ function loadRendererInternals() {
     setTimeout,
     clearTimeout,
     window: {
-      addEventListener: () => {},
+      listeners: {},
+      addEventListener(eventName, handler) {
+        this.listeners[eventName] = handler;
+      },
       api: {}
     },
     document: {
@@ -737,5 +740,25 @@ describe('Saved Records Pagination Controls', () => {
     await new Promise(resolve => setTimeout(resolve, 280));
 
     assert.strictEqual(state.pagination.page, 1);
+  });
+});
+
+describe('Window unhandledrejection listener', () => {
+  it('should intercept unhandled promise rejections and show a toast with details', () => {
+    const localSandbox = loadRendererInternals();
+    const listener = localSandbox.window.listeners['unhandledrejection'];
+    assert.ok(listener, 'unhandledrejection listener should be registered');
+
+    // Create a mock toast element in the document sandbox
+    const toastEl = makeFakeElement('div');
+    localSandbox.document.elements.set('toast', toastEl);
+
+    // Call the listener with a mock event
+    listener({
+      reason: new Error('Simulated async failure')
+    });
+
+    assert.ok(toastEl.classList.contains('is-visible'), 'Toast should be visible');
+    assert.ok(toastEl.textContent.includes('Simulated async failure'), 'Toast message should contain error details');
   });
 });

@@ -20,7 +20,8 @@ import {
   applyTheme, 
   loadSavedTheme, 
   checkAndShowWhatsNew, 
-  setupAutoUpdateUI 
+  setupAutoUpdateUI,
+  showToast
 } from './renderer/overlays.js';
 import { bindEvents } from './renderer/events.js';
 import { setQueueRenderCallback, setValidationErrorsCallback } from './renderer/queue.js';
@@ -65,6 +66,11 @@ export async function init() {
 
 if (typeof window !== 'undefined' && typeof document !== 'undefined') {
   window.addEventListener('DOMContentLoaded', init);
+  window.addEventListener('unhandledrejection', (event) => {
+    console.error('Unhandled rejection:', event.reason);
+    const details = event.reason ? (event.reason.message || String(event.reason)) : 'Unknown error';
+    showToast(`An unexpected error occurred: ${details}`);
+  });
 }
 
 // Re-export utility functions for unit testing compatibility
