@@ -428,8 +428,28 @@ function saveReviewedDocument(payload) {
   return saveTransaction(payload);
 }
 
-function listRecords() {
-  return ensureDb().prepare([
+function listRecords(options) {
+  options = options || {};
+  const search = normalizeText(options.search).toLowerCase();
+  const docType = normalizeText(options.type);
+  const page = options.page ? Number(options.page) : null;
+  const limit = options.limit ? Number(options.limit) : null;
+
+  const conditions = [];
+  const params = [];
+
+  if (docType) {
+    conditions.push('documents.doc_type = ?');
+    params.push(docType);
+  }
+
+  if (search) {
+    conditions.push('(LOWER(staff.first_name) LIKE ? OR LOWER(staff.last_name) LIKE ? OR LOWER(documents.doc_number) LIKE ? OR LOWER(documents.doc_type) LIKE ?)');
+    const term = `%${search}%`;
+    params.push(term, term, term, term);
+  }
+
+  let sql = [
     'SELECT',
     '  documents.id AS document_id,',
     '  documents.staff_id,',
@@ -446,9 +466,55 @@ function listRecords() {
     '  documents.review_status,',
     '  documents.uploaded_at',
     'FROM documents',
-    'LEFT JOIN staff ON staff.id = documents.staff_id',
-    'ORDER BY documents.uploaded_at DESC, documents.id DESC'
-  ].join('\n')).all();
+    'LEFT JOIN staff ON staff.id = documents.staff_id'
+  ].join('\n');
+
+  if (conditions.length > 0) {
+    sql += '\nWHERE ' + conditions.join(' AND ');
+  }
+
+  sql += '\nORDER BY documents.uploaded_at DESC, documents.id DESC';
+
+  if (limit !== null && page !== null) {
+    const offset = (page - 1) * limit;
+    sql += '\nLIMIT ? OFFSET ?';
+    params.push(limit, offset);
+  }
+
+  return ensureDb().prepare(sql).all(...params);
+}
+
+function countRecords(options) {
+  options = options || {};
+  const search = normalizeText(options.search).toLowerCase();
+  const docType = normalizeText(options.type);
+
+  const conditions = [];
+  const params = [];
+
+  if (docType) {
+    conditions.push('documents.doc_type = ?');
+    params.push(docType);
+  }
+
+  if (search) {
+    conditions.push('(LOWER(staff.first_name) LIKE ? OR LOWER(staff.last_name) LIKE ? OR LOWER(documents.doc_number) LIKE ? OR LOWER(documents.doc_type) LIKE ?)');
+    const term = `%${search}%`;
+    params.push(term, term, term, term);
+  }
+
+  let sql = [
+    'SELECT COUNT(1) AS count',
+    'FROM documents',
+    'LEFT JOIN staff ON staff.id = documents.staff_id'
+  ].join('\n');
+
+  if (conditions.length > 0) {
+    sql += '\nWHERE ' + conditions.join(' AND ');
+  }
+
+  const row = ensureDb().prepare(sql).get(...params);
+  return row ? row.count : 0;
 }
 
 module.exports = {
@@ -457,6 +523,7 @@ module.exports = {
   close: close,
   saveReviewedDocument: saveReviewedDocument,
   listRecords: listRecords,
+  countRecords: countRecords,
   logAudit: logAudit,
   validateReviewedDocument: validateReviewedDocument
 };

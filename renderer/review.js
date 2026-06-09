@@ -119,8 +119,25 @@ export async function saveSelectedReview(reviewStatus) {
 }
 
 export async function loadRecords() {
-  if (!window.api || !window.api.listRecords) return;
-  state.records = await window.api.listRecords();
+  if (!window.api || !window.api.listRecords || !window.api.countRecords) return;
+
+  const searchText = (query('record-search-input')?.value || '').toLowerCase().trim();
+  const typeFilter = query('record-type-filter')?.value || '';
+
+  const options = {
+    search: searchText,
+    type: typeFilter,
+    page: state.pagination.page,
+    limit: state.pagination.limit
+  };
+
+  const [records, total] = await Promise.all([
+    window.api.listRecords(options),
+    window.api.countRecords({ search: searchText, type: typeFilter })
+  ]);
+
+  state.records = records;
+  state.pagination.total = total;
 }
 
 export function renderRecords() {
@@ -128,39 +145,20 @@ export function renderRecords() {
   if (!body) return;
   body.innerHTML = '';
 
-  const searchText = (query('record-search-input')?.value || '').toLowerCase().trim();
-  const typeFilter = query('record-type-filter')?.value || '';
+  const records = state.records || [];
 
-  const filteredRecords = state.records.filter((record) => {
-    if (typeFilter && record.doc_type !== typeFilter) {
-      return false;
-    }
-    if (searchText) {
-      const firstName = (record.first_name || '').toLowerCase();
-      const lastName = (record.last_name || '').toLowerCase();
-      const docNum = (record.doc_number || '').toLowerCase();
-      const docType = (record.doc_type || '').toLowerCase();
-      
-      const matchSearch = firstName.includes(searchText) || 
-                          lastName.includes(searchText) || 
-                          docNum.includes(searchText) || 
-                          docType.includes(searchText);
-      if (!matchSearch) return false;
-    }
-    return true;
-  });
-
-  if (filteredRecords.length === 0) {
+  if (records.length === 0) {
     const row = document.createElement('tr');
     const cell = document.createElement('td');
     cell.colSpan = 7;
     cell.textContent = 'No approved records saved yet.';
     row.appendChild(cell);
     body.appendChild(row);
+    updatePaginationUI();
     return;
   }
 
-  filteredRecords.forEach((record) => {
+  records.forEach((record) => {
     const row = document.createElement('tr');
     [
       `${record.first_name || ''} ${record.last_name || ''}`.trim(),
@@ -177,6 +175,31 @@ export function renderRecords() {
     });
     body.appendChild(row);
   });
+
+  updatePaginationUI();
+}
+
+export function updatePaginationUI() {
+  const infoText = query('pagination-info-text');
+  const prevBtn = query('records-prev-page');
+  const nextBtn = query('records-next-page');
+
+  if (!infoText || !prevBtn || !nextBtn) return;
+
+  const { page, limit, total } = state.pagination;
+  const totalPages = Math.ceil(total / limit);
+
+  if (total === 0) {
+    infoText.textContent = 'Showing 0-0 of 0 records';
+    prevBtn.disabled = true;
+    nextBtn.disabled = true;
+  } else {
+    const start = (page - 1) * limit + 1;
+    const end = Math.min(page * limit, total);
+    infoText.textContent = `Showing ${start}-${end} of ${total} records`;
+    prevBtn.disabled = page <= 1;
+    nextBtn.disabled = page >= totalPages;
+  }
 }
 
 export async function exportRecords() {

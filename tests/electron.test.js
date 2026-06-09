@@ -163,6 +163,9 @@ describe('Electron app wiring', () => {
           },
           listRecords: () => {
             return [{ id: 1 }];
+          },
+          countRecords: () => {
+            return 1;
           }
         },
         './sidecar_bridge': {
@@ -207,7 +210,7 @@ describe('Electron app wiring', () => {
 
       assert.deepStrictEqual(
         Object.keys(registeredHandlers).sort(),
-        ['app:getVersion', 'documents:previewPdfPage', 'documents:readAsBase64', 'documents:select', 'ocr:downloadModel', 'ocr:process', 'records:export', 'records:list', 'release-notes:get', 'review:save']
+        ['app:getVersion', 'documents:previewPdfPage', 'documents:readAsBase64', 'documents:select', 'ocr:downloadModel', 'ocr:process', 'records:count', 'records:export', 'records:list', 'release-notes:get', 'review:save']
       );
 
       const senderEvent = { senderFrame: { url: trustedSenderUrl } };
@@ -288,7 +291,7 @@ describe('Electron app wiring', () => {
     assert.ok(exposed.api);
     assert.deepStrictEqual(
       Object.keys(exposed.api).sort(),
-      ['checkForUpdates', 'downloadModel', 'exportRecords', 'fetchReleaseNotes', 'getVersion', 'installUpdate', 'listRecords', 'onDownloadStatus', 'onUpdateStatus', 'previewPdfPage', 'processOCR', 'readAsBase64', 'saveReview', 'selectDocuments']
+      ['checkForUpdates', 'countRecords', 'downloadModel', 'exportRecords', 'fetchReleaseNotes', 'getVersion', 'installUpdate', 'listRecords', 'onDownloadStatus', 'onUpdateStatus', 'previewPdfPage', 'processOCR', 'readAsBase64', 'saveReview', 'selectDocuments']
     );
 
     await exposed.api.selectDocuments();
@@ -296,6 +299,7 @@ describe('Electron app wiring', () => {
     await exposed.api.processOCR('scan.jpg');
     await exposed.api.saveReview({ ok: true });
     await exposed.api.listRecords();
+    await exposed.api.countRecords();
     await exposed.api.exportRecords();
 
     assert.deepStrictEqual(invokeCalls, [
@@ -304,6 +308,7 @@ describe('Electron app wiring', () => {
       ['ocr:process', 'scan.jpg'],
       ['review:save', { ok: true }],
       ['records:list', undefined],
+      ['records:count', undefined],
       ['records:export', undefined]
     ]);
   });

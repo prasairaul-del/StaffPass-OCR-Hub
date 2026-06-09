@@ -82,7 +82,9 @@ export function bindEvents() {
   const searchInput = query('record-search-input');
   const spinner = query('search-spinner');
 
-  const debouncedRender = debounce(() => {
+  const debouncedSearch = debounce(async () => {
+    state.pagination.page = 1;
+    await loadRecords();
     renderRecords();
     if (spinner) {
       spinner.classList.remove('is-searching');
@@ -93,9 +95,36 @@ export function bindEvents() {
     if (spinner) {
       spinner.classList.add('is-searching');
     }
-    debouncedRender();
+    debouncedSearch();
   });
-  query('record-type-filter')?.addEventListener('change', () => {
+
+  query('record-type-filter')?.addEventListener('change', async () => {
+    state.pagination.page = 1;
+    await loadRecords();
+    renderRecords();
+  });
+
+  query('records-prev-page')?.addEventListener('click', async () => {
+    if (state.pagination.page > 1) {
+      state.pagination.page -= 1;
+      await loadRecords();
+      renderRecords();
+    }
+  });
+
+  query('records-next-page')?.addEventListener('click', async () => {
+    const totalPages = Math.ceil(state.pagination.total / state.pagination.limit);
+    if (state.pagination.page < totalPages) {
+      state.pagination.page += 1;
+      await loadRecords();
+      renderRecords();
+    }
+  });
+
+  query('records-page-size')?.addEventListener('change', async (event) => {
+    state.pagination.limit = Number(event.target.value);
+    state.pagination.page = 1;
+    await loadRecords();
     renderRecords();
   });
 

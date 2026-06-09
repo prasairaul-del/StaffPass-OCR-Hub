@@ -40,6 +40,12 @@ function makeFakeElement(tagName = 'div') {
     addEventListener: (eventName, handler) => {
       listeners[eventName] = handler;
     },
+    trigger: (eventName, eventObj) => {
+      if (listeners[eventName]) {
+        return listeners[eventName](eventObj || { preventDefault() {}, target: element });
+      }
+      return undefined;
+    },
     click: () => {
       if (listeners.click) {
         return listeners.click({ preventDefault() {}, target: element });
@@ -127,7 +133,7 @@ function loadRendererInternals() {
   sandbox.global = sandbox;
   sandbox.globalThis = sandbox;
 
-  const exposedSource = `${source}\nmodule.exports.__test__ = { bindEvents, dismissWhatsNew, enforceOverlayFocus, getExtractionNotes, getReviewStatusForExtraction, keepFocusInsideOverlay, showWhatsNewDialog, updateDocumentPreview, handleReviewKeyDown, focusNextField, state };\nmodule.exports.createQueueItem = createQueueItem;\nmodule.exports.getConfidenceStatus = getConfidenceStatus;\nmodule.exports.normalizeExtraction = normalizeExtraction;\nmodule.exports.validateReviewData = validateReviewData;\nmodule.exports.debounce = debounce;`;
+  const exposedSource = `${source}\nmodule.exports.__test__ = { bindEvents, dismissWhatsNew, enforceOverlayFocus, getExtractionNotes, getReviewStatusForExtraction, keepFocusInsideOverlay, showWhatsNewDialog, updateDocumentPreview, handleReviewKeyDown, focusNextField, state, loadRecords, renderRecords, updatePaginationUI };\nmodule.exports.createQueueItem = createQueueItem;\nmodule.exports.getConfidenceStatus = getConfidenceStatus;\nmodule.exports.normalizeExtraction = normalizeExtraction;\nmodule.exports.validateReviewData = validateReviewData;\nmodule.exports.debounce = debounce;`;
   
   vm.runInNewContext(exposedSource, sandbox, { filename: path.join(__dirname, '..', 'renderer.js') });
   
@@ -601,5 +607,134 @@ describe('Renderer UI Helpers', () => {
       assert.strictEqual(called, 1);
       assert.strictEqual(argPassed, 'third');
     });
+  });
+});
+
+describe('Saved Records Pagination Controls', () => {
+  let localSandbox;
+  let listRecordsCalls;
+  let countRecordsCalls;
+  let tableBody;
+  let infoText;
+  let prevBtn;
+  let nextBtn;
+  let searchInput;
+  let typeFilter;
+  let pageSizeSelector;
+
+  beforeEach(() => {
+    localSandbox = loadRendererInternals();
+    listRecordsCalls = [];
+    countRecordsCalls = [];
+
+    tableBody = makeFakeElement('tbody');
+    infoText = makeFakeElement('div');
+    prevBtn = makeFakeElement('button');
+    nextBtn = makeFakeElement('button');
+    searchInput = makeFakeElement('input');
+    typeFilter = makeFakeElement('select');
+    pageSizeSelector = makeFakeElement('select');
+
+    localSandbox.document.elements.set('records-table-body', tableBody);
+    localSandbox.document.elements.set('pagination-info-text', infoText);
+    localSandbox.document.elements.set('records-prev-page', prevBtn);
+    localSandbox.document.elements.set('records-next-page', nextBtn);
+    localSandbox.document.elements.set('record-search-input', searchInput);
+    localSandbox.document.elements.set('record-type-filter', typeFilter);
+    localSandbox.document.elements.set('records-page-size', pageSizeSelector);
+
+    localSandbox.window.api = {
+      listRecords: async (options) => {
+        listRecordsCalls.push(JSON.parse(JSON.stringify(options)));
+        return [
+          { first_name: 'John', last_name: 'Doe', doc_type: 'Passport', doc_number: '123', expiry_date: '2026-06-09', confidence_score: 95, review_status: 'Approved' }
+        ];
+      },
+      countRecords: async (options) => {
+        countRecordsCalls.push(JSON.parse(JSON.stringify(options)));
+        return 15;
+      }
+    };
+  });
+
+  it('should query state.pagination and render records properly', async () => {
+    const { loadRecords, renderRecords, state } = localSandbox.module.exports.__test__;
+    state.pagination = { page: 1, limit: 10, total: 0 };
+
+    await loadRecords();
+    assert.strictEqual(listRecordsCalls.length, 1);
+    assert.deepStrictEqual(listRecordsCalls[0], { search: '', type: '', page: 1, limit: 10 });
+    assert.strictEqual(countRecordsCalls.length, 1);
+    assert.deepStrictEqual(countRecordsCalls[0], { search: '', type: '' });
+    assert.strictEqual(state.pagination.total, 15);
+
+    renderRecords();
+    assert.strictEqual(infoText.textContent, 'Showing 1-10 of 15 records');
+    assert.strictEqual(prevBtn.disabled, true);
+    assert.strictEqual(nextBtn.disabled, false);
+  });
+
+  it('should handle prev and next page clicks', async () => {
+    const { bindEvents, state } = localSandbox.module.exports.__test__;
+    state.pagination = { page: 1, limit: 10, total: 15 };
+
+    bindEvents();
+
+    localSandbox.window.api.listRecords = async (options) => {
+      listRecordsCalls.push(JSON.parse(JSON.stringify(options)));
+      return [];
+    };
+
+    await nextBtn.click();
+    assert.strictEqual(state.pagination.page, 2);
+    assert.strictEqual(listRecordsCalls[0].page, 2);
+
+    await prevBtn.click();
+    assert.strictEqual(state.pagination.page, 1);
+    assert.strictEqual(listRecordsCalls[1].page, 1);
+  });
+
+  it('should handle page size changes', async () => {
+    const { bindEvents, state } = localSandbox.module.exports.__test__;
+    state.pagination = { page: 2, limit: 10, total: 15 };
+
+    bindEvents();
+
+    localSandbox.window.api.listRecords = async (options) => {
+      listRecordsCalls.push(JSON.parse(JSON.stringify(options)));
+      return [];
+    };
+
+    pageSizeSelector.value = '25';
+    await pageSizeSelector.trigger('change', { target: { value: '25' } });
+
+    assert.strictEqual(state.pagination.limit, 25);
+    assert.strictEqual(state.pagination.page, 1);
+  });
+
+  it('should reset page index to 1 when changing search query or doc type filter', async () => {
+    const { bindEvents, state } = localSandbox.module.exports.__test__;
+    state.pagination = { page: 3, limit: 10, total: 35 };
+
+    bindEvents();
+
+    localSandbox.window.api.listRecords = async (options) => {
+      listRecordsCalls.push(JSON.parse(JSON.stringify(options)));
+      return [];
+    };
+
+    typeFilter.value = 'Passport';
+    await typeFilter.trigger('change');
+
+    assert.strictEqual(state.pagination.page, 1);
+
+    state.pagination.page = 3;
+
+    searchInput.value = 'Alice';
+    await searchInput.trigger('input');
+
+    await new Promise(resolve => setTimeout(resolve, 280));
+
+    assert.strictEqual(state.pagination.page, 1);
   });
 });

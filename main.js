@@ -204,9 +204,14 @@ function registerIpcHandlers() {
     return db.saveReviewedDocument(payload);
   });
 
-  ipcMain.handle('records:list', async (event) => {
+  ipcMain.handle('records:list', async (event, options) => {
     assertTrustedSender(event);
-    return db.listRecords();
+    return db.listRecords(options);
+  });
+
+  ipcMain.handle('records:count', async (event, options) => {
+    assertTrustedSender(event);
+    return db.countRecords(options);
   });
 
   ipcMain.handle('records:export', async (event) => {

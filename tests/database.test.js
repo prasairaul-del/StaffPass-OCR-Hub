@@ -329,4 +329,59 @@ describe('Database persistence helpers', () => {
       /review status/i
     );
   });
+
+  it('supports pagination, countRecords, filtering, and backward compatibility in listRecords', () => {
+    const basePayload = {
+      first_name: 'John',
+      last_name: 'Doe',
+      phone_number: '+971500000000',
+      doc_type: 'PASSPORT',
+      doc_number: 'P1234567',
+      expiry_date: '2030-12-31',
+      confidence_score: 95,
+      file_path: 'sample/passport.jpg',
+      review_status: 'Approved'
+    };
+
+    db.saveReviewedDocument(basePayload);
+    db.saveReviewedDocument({
+      ...basePayload,
+      first_name: 'Alice',
+      doc_type: 'VISA',
+      doc_number: 'V9876543'
+    });
+    db.saveReviewedDocument({
+      ...basePayload,
+      first_name: 'Bob',
+      doc_type: 'PASSPORT',
+      doc_number: 'P7777777'
+    });
+
+    const allRecords = db.listRecords();
+    assert.strictEqual(allRecords.length, 3);
+
+    const allCount = db.countRecords();
+    assert.strictEqual(allCount, 3);
+
+    const searchRecords = db.listRecords({ search: 'Alice' });
+    assert.strictEqual(searchRecords.length, 1);
+    assert.strictEqual(searchRecords[0].first_name, 'Alice');
+
+    const searchCount = db.countRecords({ search: 'Alice' });
+    assert.strictEqual(searchCount, 1);
+
+    const typeRecords = db.listRecords({ type: 'PASSPORT' });
+    assert.strictEqual(typeRecords.length, 2);
+    const typeCount = db.countRecords({ type: 'PASSPORT' });
+    assert.strictEqual(typeCount, 2);
+
+    const page1 = db.listRecords({ page: 1, limit: 2 });
+    assert.strictEqual(page1.length, 2);
+    assert.strictEqual(page1[0].first_name, 'Bob');
+    assert.strictEqual(page1[1].first_name, 'Alice');
+
+    const page2 = db.listRecords({ page: 2, limit: 2 });
+    assert.strictEqual(page2.length, 1);
+    assert.strictEqual(page2[0].first_name, 'John');
+  });
 });
