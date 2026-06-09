@@ -36,60 +36,6 @@ function resolvePython() {
   return 'python';
 }
 
-function runPythonJson(scriptArgs, code, timeoutMs = DEFAULT_TIMEOUT_MS, cwd = __dirname) {
-  return new Promise((resolve, reject) => {
-    const python = resolvePython();
-    const childProcess = spawn(python, ['-c', code, ...scriptArgs], {
-      stdio: ['ignore', 'pipe', 'pipe'],
-      env: { ...process.env },
-      cwd
-    });
-
-    let stdout = '';
-    let stderr = '';
-    const timeout = setTimeout(() => {
-      try {
-        childProcess.kill('SIGKILL');
-      } catch (_err) {}
-      reject(new Error(`PDF preview request timed out after ${timeoutMs}ms`));
-    }, timeoutMs);
-
-    childProcess.stdout.on('data', (chunk) => {
-      stdout += chunk.toString();
-    });
-
-    childProcess.stderr.on('data', (chunk) => {
-      stderr += chunk.toString();
-    });
-
-    childProcess.on('error', (error) => {
-      clearTimeout(timeout);
-      reject(error);
-    });
-
-    childProcess.on('exit', (code, signal) => {
-      clearTimeout(timeout);
-      if (code !== 0) {
-        const suffix = stderr.trim() ? `: ${stderr.trim()}` : '';
-        reject(new Error(`PDF preview sidecar exited with code ${code ?? 'null'} and signal ${signal ?? 'null'}${suffix}`));
-        return;
-      }
-
-      const output = stdout.trim();
-      if (!output) {
-        reject(new Error('PDF preview sidecar returned no data.'));
-        return;
-      }
-
-      try {
-        resolve(JSON.parse(output));
-      } catch (error) {
-        reject(error);
-      }
-    });
-  });
-}
-
 function startChild() {
   const scriptPath = path.join(getSidecarDir(), 'ocr_sidecar.py');
   const python = resolvePython();
@@ -148,7 +94,8 @@ function settleResponse(line, request) {
   try {
     const response = JSON.parse(line);
     if (response.status === 'success') {
-      request.resolve(normalizeOcrResponse(response.data));
+      const data = request.type === 'ocr' ? normalizeOcrResponse(response.data) : response.data;
+      request.resolve(data);
       return;
     }
     request.reject(new Error(response.message || 'OCR failed'));
@@ -182,6 +129,7 @@ function runOCR(filePath) {
     const py = getChild();
     const timeoutMs = Number(process.env.OCR_TIMEOUT_MS || DEFAULT_TIMEOUT_MS);
     const request = {
+      type: 'ocr',
       resolve,
       reject,
       timeout: setTimeout(() => {
@@ -270,16 +218,27 @@ function downloadModel(onProgress) {
 }
 
 function previewPdfPage(filePath) {
-  const code = [
-    'import json',
-    'import sys',
-    'from pdf_preview import render_first_page_pdf_preview',
-    '',
-    'result = render_first_page_pdf_preview(sys.argv[1])',
-    'print(json.dumps(result))'
-  ].join('\n');
+  return new Promise((resolve, reject) => {
+    const py = getChild();
+    const timeoutMs = Number(process.env.PDF_PREVIEW_TIMEOUT_MS || DEFAULT_TIMEOUT_MS);
+    const request = {
+      type: 'preview',
+      resolve,
+      reject,
+      timeout: setTimeout(() => {
+        removeRequest(request);
+        reject(new Error(`PDF preview request timed out after ${timeoutMs}ms`));
+      }, timeoutMs)
+    };
 
-  return runPythonJson([filePath], code, Number(process.env.PDF_PREVIEW_TIMEOUT_MS || DEFAULT_TIMEOUT_MS), getSidecarDir());
+    pending.push(request);
+    py.stdin.write(`${JSON.stringify({ action: 'preview', file_path: filePath })}\n`, (error) => {
+      if (!error) return;
+      removeRequest(request);
+      clearTimeout(request.timeout);
+      reject(error);
+    });
+  });
 }
 
 module.exports = { runOCR, stop, isRunning, downloadModel, previewPdfPage, normalizeOcrResponse };

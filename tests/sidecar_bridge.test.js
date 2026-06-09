@@ -1,9 +1,17 @@
 process.env.OCR_ENGINE = 'mock';
 const assert = require('assert');
+const fs = require('fs');
 const bridge = require('../sidecar_bridge');
 
 describe('OCR Sidecar Bridge', () => {
+  before(() => {
+    fs.writeFileSync('dummy.jpg', 'mock image data');
+  });
+
   after(() => {
+    try {
+      fs.unlinkSync('dummy.jpg');
+    } catch (e) {}
     bridge.stop();
   });
 

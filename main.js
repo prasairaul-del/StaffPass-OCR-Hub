@@ -175,7 +175,7 @@ function registerIpcHandlers() {
     assertTrustedSender(event);
     const safePath = assertAllowedDocumentPath(filePath, PREVIEW_IMAGE_EXTENSIONS);
     try {
-      const data = fs.readFileSync(safePath);
+      const data = await fs.promises.readFile(safePath);
       const mimeType = getPreviewMimeType(safePath);
       return `data:${mimeType};base64,${data.toString('base64')}`;
     } catch (err) {

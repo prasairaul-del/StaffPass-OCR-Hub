@@ -26,6 +26,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Documented the three release states: unsigned smoke build, cert-ready guarded build, and production release with fresh updater metadata.
 
 ### Fixed
+- Resolved `compareVersions` undefined crash in the updater/release flow.
+- Unified response envelope shape of `MockAdapter` to match `GLMOCRAdapter`.
+- Split monolithic 1,307-line `renderer.js` into modular ES Modules under `renderer/` to improve code organization.
+- Integrated `pdf_preview` into the persistent sidecar command loop to avoid spawning a separate Python process per preview.
+- Removed dead code (`downloadModel` function, `escapeCsvValue`, `recordsToCsv`) from the renderer.
+- Added input file path verification and validation in the Python sidecar.
+- Replaced synchronous `fs.readFileSync` in the main process (`main.js`) with async `fs.promises.readFile` for document loading to prevent blocking the event loop.
 - GLM-OCR fallback now returns a degraded manual-review response instead of fabricated identity data.
 - PDF preview no longer uses a mock frame; unsupported inline rendering is shown explicitly.
 - Release validation now treats stale `latest.yml` metadata and missing installer assets as hard release failures.

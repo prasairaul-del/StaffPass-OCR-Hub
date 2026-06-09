@@ -7,9 +7,11 @@ if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from mock_adapter import MockAdapter
     from glmocr_adapter import GLMOCRAdapter
+    from pdf_preview import render_first_page_pdf_preview
 else:
     from .mock_adapter import MockAdapter
     from .glmocr_adapter import GLMOCRAdapter
+    from .pdf_preview import render_first_page_pdf_preview
 
 
 def main():
@@ -28,6 +30,9 @@ def main():
                 action = cmd.get("action")
                 if action == "ocr":
                     file_path = cmd.get("file_path")
+                    if not file_path or not os.path.exists(file_path):
+                        print(json.dumps({"error": "Missing or invalid file_path"}))
+                        continue
                     # Load model on demand to minimize idle RAM footprint
                     adapter.load()
                     try:
@@ -36,6 +41,16 @@ def main():
                     finally:
                         # Ensure we unload memory immediately after processing
                         adapter.unload()
+                elif action == "preview":
+                    file_path = cmd.get("file_path")
+                    if not file_path or not os.path.exists(file_path):
+                        print(json.dumps({"error": "Missing or invalid file_path"}))
+                        continue
+                    try:
+                        result = render_first_page_pdf_preview(file_path)
+                        print(json.dumps({"status": "success", "data": result}))
+                    except Exception as error:
+                        print(json.dumps({"status": "error", "message": str(error)}))
                 elif action == "exit":
                     break
                 else:

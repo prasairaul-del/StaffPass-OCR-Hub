@@ -2,12 +2,6 @@ const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
-const {
-  createQueueItem,
-  getConfidenceStatus,
-  normalizeExtraction,
-  validateReviewData
-} = require('../renderer');
 
 function makeFakeElement(tagName = 'div') {
   const listeners = {};
@@ -72,8 +66,32 @@ function makeFakeElement(tagName = 'div') {
 }
 
 function loadRendererInternals() {
-  const rendererPath = path.join(__dirname, '..', 'renderer.js');
-  const source = fs.readFileSync(rendererPath, 'utf8');
+  const dir = path.join(__dirname, '..', 'renderer');
+  const files = [
+    path.join(dir, 'state.js'),
+    path.join(dir, 'dom.js'),
+    path.join(dir, 'utils.js'),
+    path.join(dir, 'queue.js'),
+    path.join(dir, 'ocr.js'),
+    path.join(dir, 'review.js'),
+    path.join(dir, 'overlays.js'),
+    path.join(__dirname, '..', 'renderer.js')
+  ];
+
+  let source = '';
+  for (const f of files) {
+    source += fs.readFileSync(f, 'utf8') + '\n';
+  }
+
+  // Strip all imports and exports
+  source = source
+    .replace(/^\s*import\s+[\s\S]*?from\s+['"].*?['"];?/gm, '')
+    .replace(/^\s*export\s+const\s+/gm, 'const ')
+    .replace(/^\s*export\s+let\s+/gm, 'let ')
+    .replace(/^\s*export\s+function\s+/gm, 'function ')
+    .replace(/^\s*export\s+async\s+function\s+/gm, 'async function ')
+    .replace(/^\s*export\s+\{[\s\S]*?\}\s+from\s+['"].*?['"];?/gm, '');
+
   const sandbox = {
     console,
     process,
@@ -109,10 +127,25 @@ function loadRendererInternals() {
   sandbox.global = sandbox;
   sandbox.globalThis = sandbox;
 
-  const exposedSource = `${source}\nmodule.exports.__test__ = { bindEvents, dismissWhatsNew, enforceOverlayFocus, getExtractionNotes, getReviewStatusForExtraction, keepFocusInsideOverlay, showWhatsNewDialog, updateDocumentPreview };`;
-  vm.runInNewContext(exposedSource, sandbox, { filename: rendererPath });
+  const exposedSource = `${source}\nmodule.exports.__test__ = { bindEvents, dismissWhatsNew, enforceOverlayFocus, getExtractionNotes, getReviewStatusForExtraction, keepFocusInsideOverlay, showWhatsNewDialog, updateDocumentPreview };\nmodule.exports.createQueueItem = createQueueItem;\nmodule.exports.getConfidenceStatus = getConfidenceStatus;\nmodule.exports.normalizeExtraction = normalizeExtraction;\nmodule.exports.validateReviewData = validateReviewData;`;
+  
+  vm.runInNewContext(exposedSource, sandbox, { filename: path.join(__dirname, '..', 'renderer.js') });
+  
+  sandbox.createQueueItem = (...args) => JSON.parse(JSON.stringify(sandbox.module.exports.createQueueItem(...args)));
+  sandbox.getConfidenceStatus = sandbox.module.exports.getConfidenceStatus;
+  sandbox.normalizeExtraction = (...args) => JSON.parse(JSON.stringify(sandbox.module.exports.normalizeExtraction(...args)));
+  sandbox.validateReviewData = (...args) => JSON.parse(JSON.stringify(sandbox.module.exports.validateReviewData(...args)));
+
   return sandbox;
 }
+
+const sandbox = loadRendererInternals();
+const {
+  createQueueItem,
+  getConfidenceStatus,
+  normalizeExtraction,
+  validateReviewData
+} = sandbox;
 
 describe('Renderer UI Helpers', () => {
   it('should map confidence scores to review statuses', () => {

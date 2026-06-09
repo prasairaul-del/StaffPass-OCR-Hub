@@ -10,13 +10,19 @@ class MockAdapter(BaseVLMAdapter):
 
     def extract_metadata(self, file_path: str) -> dict:
         return {
-            "first_name": "JOHN",
-            "last_name": "SMITH",
-            "doc_type": "PASSPORT",
-            "doc_number": "A1234567",
-            "expiry_date": "2030-12-31",
-            "confidence_score": 98,
-            "phone_number": "+971501234567",
+            "ok": True,
+            "degraded": False,
+            "engine": "mock",
+            "warnings": [],
+            "data": {
+                "first_name": "JOHN",
+                "last_name": "SMITH",
+                "doc_type": "PASSPORT",
+                "doc_number": "A1234567",
+                "expiry_date": "2030-12-31",
+                "confidence_score": 98,
+                "phone_number": "+971501234567",
+            }
         }
 
     def unload(self):
