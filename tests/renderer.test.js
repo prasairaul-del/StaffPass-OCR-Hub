@@ -137,12 +137,13 @@ function loadRendererInternals() {
   sandbox.global = sandbox;
   sandbox.globalThis = sandbox;
 
-  const exposedSource = `${source}\nmodule.exports.__test__ = { bindEvents, dismissWhatsNew, enforceOverlayFocus, getExtractionNotes, getReviewStatusForExtraction, keepFocusInsideOverlay, showWhatsNewDialog, updateDocumentPreview, handleReviewKeyDown, focusNextField, state, loadRecords, renderRecords, updatePaginationUI };\nmodule.exports.createQueueItem = createQueueItem;\nmodule.exports.getConfidenceStatus = getConfidenceStatus;\nmodule.exports.normalizeExtraction = normalizeExtraction;\nmodule.exports.validateReviewData = validateReviewData;\nmodule.exports.debounce = debounce;`;
+  const exposedSource = `${source}\nmodule.exports.__test__ = { bindEvents, dismissWhatsNew, enforceOverlayFocus, getExtractionNotes, getReviewStatusForExtraction, keepFocusInsideOverlay, showWhatsNewDialog, updateDocumentPreview, handleReviewKeyDown, focusNextField, state, loadRecords, renderRecords, updatePaginationUI };\nmodule.exports.createQueueItem = createQueueItem;\nmodule.exports.getConfidenceStatus = getConfidenceStatus;\nmodule.exports.createConfidenceBadge = createConfidenceBadge;\nmodule.exports.normalizeExtraction = normalizeExtraction;\nmodule.exports.validateReviewData = validateReviewData;\nmodule.exports.debounce = debounce;`;
   
   vm.runInNewContext(exposedSource, sandbox, { filename: path.join(__dirname, '..', 'renderer.js') });
   
   sandbox.createQueueItem = (...args) => JSON.parse(JSON.stringify(sandbox.module.exports.createQueueItem(...args)));
   sandbox.getConfidenceStatus = sandbox.module.exports.getConfidenceStatus;
+  sandbox.createConfidenceBadge = sandbox.module.exports.createConfidenceBadge;
   sandbox.normalizeExtraction = (...args) => JSON.parse(JSON.stringify(sandbox.module.exports.normalizeExtraction(...args)));
   sandbox.validateReviewData = (...args) => JSON.parse(JSON.stringify(sandbox.module.exports.validateReviewData(...args)));
   sandbox.debounce = sandbox.module.exports.debounce;
@@ -155,6 +156,7 @@ const {
   createQueueItem,
   debounce,
   getConfidenceStatus,
+  createConfidenceBadge,
   normalizeExtraction,
   validateReviewData
 } = sandbox;
@@ -164,6 +166,26 @@ describe('Renderer UI Helpers', () => {
     assert.strictEqual(getConfidenceStatus(95), 'Trusted');
     assert.strictEqual(getConfidenceStatus(80), 'Review Recommended');
     assert.strictEqual(getConfidenceStatus(79), 'Manual Review Required');
+  });
+
+  it('should create styled confidence badges with icons and colors', () => {
+    const highBadge = createConfidenceBadge(98);
+    assert.ok(highBadge.classList.contains('confidence-badge'));
+    assert.ok(highBadge.classList.contains('confidence-high'));
+    assert.ok(highBadge.innerHTML.includes('✅'));
+    assert.ok(highBadge.innerHTML.includes('98%'));
+
+    const midBadge = createConfidenceBadge(85);
+    assert.ok(midBadge.classList.contains('confidence-badge'));
+    assert.ok(midBadge.classList.contains('confidence-medium'));
+    assert.ok(midBadge.innerHTML.includes('⚠️'));
+    assert.ok(midBadge.innerHTML.includes('85%'));
+
+    const lowBadge = createConfidenceBadge(70);
+    assert.ok(lowBadge.classList.contains('confidence-badge'));
+    assert.ok(lowBadge.classList.contains('confidence-low'));
+    assert.ok(lowBadge.innerHTML.includes('❌'));
+    assert.ok(lowBadge.innerHTML.includes('70%'));
   });
 
   it('should validate required review fields', () => {

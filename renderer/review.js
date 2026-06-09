@@ -1,7 +1,7 @@
 import { state, fields } from './state.js';
 import { query, text, setStatus } from './dom.js';
 import { getSelectedItem } from './queue.js';
-import { validateReviewData } from './utils.js';
+import { validateReviewData, createConfidenceBadge } from './utils.js';
 
 let _reviewRender = () => {};
 
@@ -165,14 +165,18 @@ export function renderRecords() {
       record.doc_type,
       record.doc_number,
       record.expiry_date || '-',
-      record.notes || '-',
-      `${record.confidence_score || 0}%`,
-      record.review_status
+      record.notes || '-'
     ].forEach((value) => {
       const cell = document.createElement('td');
       cell.textContent = value || '-';
       row.appendChild(cell);
     });
+    const confidenceCell = document.createElement('td');
+    confidenceCell.appendChild(createConfidenceBadge(record.confidence_score || 0));
+    row.appendChild(confidenceCell);
+    const statusCell = document.createElement('td');
+    statusCell.textContent = record.review_status || '-';
+    row.appendChild(statusCell);
     body.appendChild(row);
   });
 

@@ -238,19 +238,28 @@ export function renderQueue() {
       _queueRender();
     });
     nameCell.appendChild(button);
+    row.appendChild(nameCell);
 
-    [
-      item.extraction?.doc_type || '-',
-      item.status === 'review' ? item.reviewStatus : item.status,
-      item.extraction ? `${item.extraction.confidence_score}%` : '-',
-      item.receivedAt
-    ].forEach((value) => {
-      const cell = document.createElement('td');
-      cell.textContent = value;
-      row.appendChild(cell);
-    });
+    const docTypeCell = document.createElement('td');
+    docTypeCell.textContent = item.extraction?.doc_type || '-';
+    row.appendChild(docTypeCell);
 
-    row.prepend(nameCell);
+    const statusCell = document.createElement('td');
+    statusCell.textContent = item.status === 'review' ? item.reviewStatus : item.status;
+    row.appendChild(statusCell);
+
+    const confidenceCell = document.createElement('td');
+    if (item.extraction) {
+      confidenceCell.appendChild(createConfidenceBadge(item.extraction.confidence_score));
+    } else {
+      confidenceCell.textContent = '-';
+    }
+    row.appendChild(confidenceCell);
+
+    const dateCell = document.createElement('td');
+    dateCell.textContent = item.receivedAt;
+    row.appendChild(dateCell);
+
     body.appendChild(row);
   });
 }
@@ -269,8 +278,26 @@ export function renderSelected() {
     || (item?.extraction ? 'OCR output loaded. Review editable fields before saving.' : 'Select a queued document to view extraction notes and review guidance.');
   text('document-notes', notes);
 
-  const confidence = item?.extraction?.confidence_score || 0;
-  text('overall-confidence', `${confidence}%`);
+  const confidenceEl = query('overall-confidence');
+  if (confidenceEl) {
+    if (item) {
+      const confidence = item.extraction?.confidence_score || 0;
+      confidenceEl.className = 'confidence-badge';
+      if (confidence >= 95) {
+        confidenceEl.classList.add('confidence-high');
+        confidenceEl.innerHTML = `<span class="badge-icon">✅</span> ${confidence}%`;
+      } else if (confidence >= 80) {
+        confidenceEl.classList.add('confidence-medium');
+        confidenceEl.innerHTML = `<span class="badge-icon">⚠️</span> ${confidence}%`;
+      } else {
+        confidenceEl.classList.add('confidence-low');
+        confidenceEl.innerHTML = `<span class="badge-icon">❌</span> ${confidence}%`;
+      }
+    } else {
+      confidenceEl.className = 'confidence-chip';
+      confidenceEl.textContent = '0%';
+    }
+  }
 
   Object.entries(fields).forEach(([key, id]) => {
     const value = item?.extraction?.[key] || '';
