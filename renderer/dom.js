@@ -87,3 +87,24 @@ export function enforceOverlayFocus(event) {
   if (typeof activeOverlay.contains === 'function' && activeOverlay.contains(event.target)) return;
   focusOverlayTarget(activeOverlay);
 }
+
+export function focusNextField(currentField) {
+  const fields = [
+    'field-first-name',
+    'field-last-name',
+    'field-doc-type',
+    'field-id-number',
+    'field-expiry-date',
+    'field-phone-number',
+    'correction-notes'
+  ];
+  const index = fields.indexOf(currentField.id);
+  if (index !== -1 && index + 1 < fields.length) {
+    const nextFieldId = fields[index + 1];
+    const nextField = query(nextFieldId);
+    if (nextField && typeof nextField.focus === 'function') {
+      nextField.focus();
+    }
+  }
+}
+

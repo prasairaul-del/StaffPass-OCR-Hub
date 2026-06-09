@@ -98,11 +98,24 @@ export async function saveSelectedReview(reviewStatus) {
     item.reviewStatus = reviewStatus;
     setStatus(`${item.fileName} saved as ${reviewStatus.toLowerCase()}.`, 'success');
     await loadRecords();
+    
+    const nextItem = state.queue.find((q) => q.status === 'queued' || q.status === 'review' || q.status === 'error');
+    if (nextItem) {
+      state.selectedId = nextItem.id;
+    } else {
+      state.selectedId = null;
+    }
+    _reviewRender();
+    setTimeout(() => {
+      const field = query('field-first-name');
+      if (field && typeof field.focus === 'function') {
+        field.focus();
+      }
+    }, 50);
   } catch (error) {
     setStatus(error.message || 'Could not save review.', 'error');
+    _reviewRender();
   }
-
-  _reviewRender();
 }
 
 export async function loadRecords() {

@@ -127,7 +127,7 @@ function loadRendererInternals() {
   sandbox.global = sandbox;
   sandbox.globalThis = sandbox;
 
-  const exposedSource = `${source}\nmodule.exports.__test__ = { bindEvents, dismissWhatsNew, enforceOverlayFocus, getExtractionNotes, getReviewStatusForExtraction, keepFocusInsideOverlay, showWhatsNewDialog, updateDocumentPreview };\nmodule.exports.createQueueItem = createQueueItem;\nmodule.exports.getConfidenceStatus = getConfidenceStatus;\nmodule.exports.normalizeExtraction = normalizeExtraction;\nmodule.exports.validateReviewData = validateReviewData;`;
+  const exposedSource = `${source}\nmodule.exports.__test__ = { bindEvents, dismissWhatsNew, enforceOverlayFocus, getExtractionNotes, getReviewStatusForExtraction, keepFocusInsideOverlay, showWhatsNewDialog, updateDocumentPreview, handleReviewKeyDown, focusNextField, state };\nmodule.exports.createQueueItem = createQueueItem;\nmodule.exports.getConfidenceStatus = getConfidenceStatus;\nmodule.exports.normalizeExtraction = normalizeExtraction;\nmodule.exports.validateReviewData = validateReviewData;`;
   
   vm.runInNewContext(exposedSource, sandbox, { filename: path.join(__dirname, '..', 'renderer.js') });
   
@@ -373,5 +373,194 @@ describe('Renderer UI Helpers', () => {
     exportButton.click();
 
     assert.deepStrictEqual(exportsCalled, ['exportRecords']);
+  });
+
+  it('should traverse documents on Alt+Down and Alt+Up', async () => {
+    const sandbox = loadRendererInternals();
+    const { handleReviewKeyDown, state } = sandbox.module.exports.__test__;
+    
+    state.activeView = 'review';
+    state.queue = [
+      { id: 'doc-1', status: 'queued', fileName: 'doc1.jpg' },
+      { id: 'doc-2', status: 'review', fileName: 'doc2.jpg' },
+      { id: 'doc-3', status: 'error', fileName: 'doc3.jpg' }
+    ];
+    state.selectedId = 'doc-1';
+
+    const whatsNew = makeFakeElement('div');
+    whatsNew.setAttribute('aria-hidden', 'true');
+    const shortcuts = makeFakeElement('div');
+    shortcuts.setAttribute('aria-hidden', 'true');
+    sandbox.document.elements.set('whats-new-overlay', whatsNew);
+    sandbox.document.elements.set('shortcuts-overlay', shortcuts);
+
+    let focusCalled = false;
+    const firstNameInput = makeFakeElement('input');
+    firstNameInput.id = 'field-first-name';
+    firstNameInput.onFocus = () => {
+      focusCalled = true;
+    };
+    sandbox.document.elements.set('field-first-name', firstNameInput);
+
+    const eventAltDown = {
+      key: 'ArrowDown',
+      altKey: true,
+      preventDefault() {
+        this.defaultPrevented = true;
+      }
+    };
+    handleReviewKeyDown(eventAltDown);
+
+    assert.strictEqual(eventAltDown.defaultPrevented, true);
+    assert.strictEqual(state.selectedId, 'doc-2');
+
+    await new Promise((resolve) => setTimeout(resolve, 60));
+    assert.strictEqual(focusCalled, true);
+
+    // Test Alt+Up
+    focusCalled = false;
+    const eventAltUp = {
+      key: 'ArrowUp',
+      altKey: true,
+      preventDefault() {
+        this.defaultPrevented = true;
+      }
+    };
+    handleReviewKeyDown(eventAltUp);
+
+    assert.strictEqual(eventAltUp.defaultPrevented, true);
+    assert.strictEqual(state.selectedId, 'doc-1');
+
+    await new Promise((resolve) => setTimeout(resolve, 60));
+    assert.strictEqual(focusCalled, true);
+  });
+
+  it('should trigger approval on Ctrl+Enter', async () => {
+    const sandbox = loadRendererInternals();
+    const { handleReviewKeyDown, state } = sandbox.module.exports.__test__;
+
+    state.activeView = 'review';
+    state.queue = [
+      { id: 'doc-1', status: 'queued', fileName: 'doc1.jpg', extraction: { first_name: 'John', last_name: 'Doe', doc_type: 'Passport', doc_number: '123' } }
+    ];
+    state.selectedId = 'doc-1';
+
+    const whatsNew = makeFakeElement('div');
+    whatsNew.setAttribute('aria-hidden', 'true');
+    const shortcuts = makeFakeElement('div');
+    shortcuts.setAttribute('aria-hidden', 'true');
+    sandbox.document.elements.set('whats-new-overlay', whatsNew);
+    sandbox.document.elements.set('shortcuts-overlay', shortcuts);
+
+    const firstNameInput = makeFakeElement('input');
+    firstNameInput.value = 'John';
+    firstNameInput.id = 'field-first-name';
+    sandbox.document.elements.set('field-first-name', firstNameInput);
+
+    const lastNameInput = makeFakeElement('input');
+    lastNameInput.value = 'Doe';
+    lastNameInput.id = 'field-last-name';
+    sandbox.document.elements.set('field-last-name', lastNameInput);
+
+    const docTypeInput = makeFakeElement('input');
+    docTypeInput.value = 'Passport';
+    docTypeInput.id = 'field-doc-type';
+    sandbox.document.elements.set('field-doc-type', docTypeInput);
+
+    const docNumInput = makeFakeElement('input');
+    docNumInput.value = '123';
+    docNumInput.id = 'field-id-number';
+    sandbox.document.elements.set('field-id-number', docNumInput);
+
+    let saveReviewCalled = false;
+    sandbox.window.api = {
+      saveReview: async (payload) => {
+        saveReviewCalled = true;
+        assert.strictEqual(payload.review_status, 'Approved');
+      },
+      listRecords: async () => []
+    };
+
+    const eventCtrlEnter = {
+      key: 'Enter',
+      ctrlKey: true,
+      preventDefault() {
+        this.defaultPrevented = true;
+      }
+    };
+    handleReviewKeyDown(eventCtrlEnter);
+
+    assert.strictEqual(eventCtrlEnter.defaultPrevented, true);
+    await new Promise((resolve) => setTimeout(resolve, 60));
+    assert.strictEqual(saveReviewCalled, true);
+  });
+
+  it('should move focus to next field on Enter key', () => {
+    const sandbox = loadRendererInternals();
+    const { handleReviewKeyDown, state } = sandbox.module.exports.__test__;
+
+    state.activeView = 'review';
+    
+    const whatsNew = makeFakeElement('div');
+    whatsNew.setAttribute('aria-hidden', 'true');
+    const shortcuts = makeFakeElement('div');
+    shortcuts.setAttribute('aria-hidden', 'true');
+    sandbox.document.elements.set('whats-new-overlay', whatsNew);
+    sandbox.document.elements.set('shortcuts-overlay', shortcuts);
+
+    const firstNameInput = makeFakeElement('input');
+    firstNameInput.id = 'field-first-name';
+    sandbox.document.elements.set('field-first-name', firstNameInput);
+
+    let nextFocused = false;
+    const lastNameInput = makeFakeElement('input');
+    lastNameInput.id = 'field-last-name';
+    lastNameInput.onFocus = () => {
+      nextFocused = true;
+    };
+    sandbox.document.elements.set('field-last-name', lastNameInput);
+
+    const eventEnter = {
+      key: 'Enter',
+      target: firstNameInput,
+      preventDefault() {
+        this.defaultPrevented = true;
+      }
+    };
+    handleReviewKeyDown(eventEnter);
+
+    assert.strictEqual(eventEnter.defaultPrevented, true);
+    assert.strictEqual(nextFocused, true);
+  });
+
+  it('should ignore hotkeys when a modal overlay is active', () => {
+    const sandbox = loadRendererInternals();
+    const { handleReviewKeyDown, state } = sandbox.module.exports.__test__;
+
+    state.activeView = 'review';
+    state.queue = [
+      { id: 'doc-1', status: 'queued', fileName: 'doc1.jpg' },
+      { id: 'doc-2', status: 'review', fileName: 'doc2.jpg' }
+    ];
+    state.selectedId = 'doc-1';
+
+    const whatsNew = makeFakeElement('div');
+    whatsNew.setAttribute('aria-hidden', 'false');
+    const shortcuts = makeFakeElement('div');
+    shortcuts.setAttribute('aria-hidden', 'true');
+    sandbox.document.elements.set('whats-new-overlay', whatsNew);
+    sandbox.document.elements.set('shortcuts-overlay', shortcuts);
+
+    const eventAltDown = {
+      key: 'ArrowDown',
+      altKey: true,
+      preventDefault() {
+        this.defaultPrevented = true;
+      }
+    };
+    handleReviewKeyDown(eventAltDown);
+
+    assert.notStrictEqual(eventAltDown.defaultPrevented, true);
+    assert.strictEqual(state.selectedId, 'doc-1');
   });
 });

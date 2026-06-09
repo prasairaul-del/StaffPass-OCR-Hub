@@ -1,5 +1,6 @@
 import { state } from './renderer/state.js';
-import { query, setStatus, enforceOverlayFocus } from './renderer/dom.js';
+import { query, setStatus, enforceOverlayFocus, focusNextField } from './renderer/dom.js';
+
 import { 
   renderMetrics, 
   renderIngestionQueue, 
@@ -140,6 +141,7 @@ export async function init() {
   });
 
   document.addEventListener('keydown', (event) => {
+    handleReviewKeyDown(event);
     if (
       // keepFocusInsideOverlay will query and trap tab focus inside overlays
       (event.key === 'Tab' && (query('whats-new-overlay')?.getAttribute('aria-hidden') === 'false' || query('shortcuts-overlay')?.getAttribute('aria-hidden') === 'false'))
@@ -205,6 +207,75 @@ export async function init() {
   setActiveView('ingestion');
   await loadRecords();
   render();
+}
+
+export function handleReviewKeyDown(event) {
+  if (state.activeView !== 'review') return;
+
+  const whatsNewOverlay = query('whats-new-overlay');
+  const shortcutsOverlay = query('shortcuts-overlay');
+  if (whatsNewOverlay && whatsNewOverlay.getAttribute('aria-hidden') !== 'true') return;
+  if (shortcutsOverlay && shortcutsOverlay.getAttribute('aria-hidden') !== 'true') return;
+
+  if (event.ctrlKey && event.key === 'Enter') {
+    event.preventDefault();
+    saveSelectedReview('Approved');
+    return;
+  }
+  if (event.ctrlKey && event.key === 'Backspace') {
+    event.preventDefault();
+    saveSelectedReview('Rejected');
+    return;
+  }
+  if (event.ctrlKey && (event.key === 's' || event.key === 'S')) {
+    event.preventDefault();
+    saveSelectedReview('Corrected');
+    return;
+  }
+  if (event.altKey && event.key === 'ArrowDown') {
+    event.preventDefault();
+    const index = state.queue.findIndex((item) => item.id === state.selectedId);
+    if (index !== -1 && index + 1 < state.queue.length) {
+      state.selectedId = state.queue[index + 1].id;
+      render();
+      setTimeout(() => {
+        const field = query('field-first-name');
+        if (field && typeof field.focus === 'function') {
+          field.focus();
+        }
+      }, 50);
+    }
+    return;
+  }
+  if (event.altKey && event.key === 'ArrowUp') {
+    event.preventDefault();
+    const index = state.queue.findIndex((item) => item.id === state.selectedId);
+    if (index !== -1 && index - 1 >= 0) {
+      state.selectedId = state.queue[index - 1].id;
+      render();
+      setTimeout(() => {
+        const field = query('field-first-name');
+        if (field && typeof field.focus === 'function') {
+          field.focus();
+        }
+      }, 50);
+    }
+    return;
+  }
+  if (event.key === 'Enter') {
+    const textInputs = [
+      'field-first-name',
+      'field-last-name',
+      'field-doc-type',
+      'field-id-number',
+      'field-expiry-date',
+      'field-phone-number'
+    ];
+    if (textInputs.includes(event.target?.id)) {
+      event.preventDefault();
+      focusNextField(event.target);
+    }
+  }
 }
 
 if (typeof window !== 'undefined' && typeof document !== 'undefined') {

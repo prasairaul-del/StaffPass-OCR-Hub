@@ -1278,3 +1278,19 @@ kbd {
     grid-template-columns: 1fr !important;
   }
 }
+
+.kbd-badge {
+  display: inline-block;
+  font-size: 0.725rem;
+  font-weight: normal;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--surface-alt);
+  color: var(--muted);
+  margin-left: 6px;
+  vertical-align: middle;
+  font-family: var(--font-mono, monospace);
+  opacity: 0.85;
+}
+
