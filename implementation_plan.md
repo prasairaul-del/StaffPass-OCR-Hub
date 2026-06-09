@@ -1,465 +1,64 @@
-# StaffPass Local OCR Hub Initial Structure Implementation Plan
+# Implementation Plan: Keyboard-Only Review Workflow
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
-
-## Current Status After Release-Readiness Pass
-
-This document preserves the original implementation plan for project history. The current application is now beyond the initial structure stage:
-
-- Electron is verified on `40.9.3` with sandboxed renderer settings, named preload APIs, IPC sender validation, and document path/extension validation.
-- OCR fallback responses use a degraded/manual-review shape instead of fabricated identity records.
-- CSV export is implemented for saved records with deterministic columns and no source file path leakage.
-- PDF preview uses Python-sidecar first-page rasterization through PyMuPDF instead of a mock preview frame.
-- SQLite persistence now includes runtime validation, migration metadata, and pre-migration `.bak` backups.
-- `package-lock.json` is part of the release source of truth for reproducible Electron/native-module builds.
-- Sensitive intake/export/archive files are ignored and must stay outside the repo; the private accreditation ZIP was quarantined outside the workspace.
-- `npm run dist:smoke` builds only an unsigned `win-unpacked` smoke directory.
-- `npm run dist:installer:unsigned` builds an unsigned local NSIS installer for test installs only.
-- `npm run dist:release` remains cert-gated for production signing, and `npm run validate:release` requires fresh signed updater metadata.
-- Electron 42 is intentionally deferred until Windows native rebuild tooling for `better-sqlite3` is verified.
-- A standalone Android Expo app now lives under `mobile/` with mobile-native capture/import, local `expo-sqlite` records, CSV sharing, EAS APK/AAB profiles, and degraded/manual-review-only OCR until a native Android OCR adapter is implemented.
-- Android APK generation is repo-ready but externally gated by one-time Expo project linking through `npx eas-cli@latest init`.
-
-**Goal:** Initialize Electron boilerplate, configure SQLite schema, and create the Python OCR sidecar with BaseVLMAdapter to build the offline document ingestion pipeline.
-
-**Architecture:** Electron main process coordinates SQLite and spawns a Python subprocess (sidecar) for ML/OCR tasks. IPC bridge passes base64 images/PDFs or paths, returning structured JSON metadata.
-
-**Tech Stack:** Electron, SQLite3, Python 3.10+, PyTorch (mocked first), PyMuPDF (for PDF processing), vanilla HTML/CSS/JS.
+This implementation plan details the step-by-step tasks required to build the Keyboard-Only Review Workflow.
 
 ---
 
-### Task 1: Electron Project Initialization & Core UI boilerplate
+## 1. Task Checklist
 
-**Files:**
-- Create: `package.json`
-- Create: `main.js`
-- Create: `preload.js`
-- Create: `renderer.js`
-- Create: `index.html`
-- Create: `index.css`
-- Create: `tests/electron.test.js`
-
-- [ ] **Step 1: Write the failing test**
-Create `tests/electron.test.js` to verify Electron launches and window is configured correctly.
-```javascript
-const assert = require('assert');
-// Mock window behavior test or simple unit check
-describe('Electron App Config', () => {
-  it('should have standard package configuration', () => {
-    const pkg = require('../package.json');
-    assert.strictEqual(pkg.main, 'main.js');
-    assert.ok(pkg.dependencies.electron);
-  });
-});
-```
-
-- [ ] **Step 2: Run test to verify it fails**
-Run: `npm test`
-Expected: FAIL (missing package.json)
-
-- [ ] **Step 3: Write minimal implementation**
-Create `package.json`:
-```json
-{
-  "name": "staffpass-ocr-hub",
-  "version": "1.0.0",
-  "main": "main.js",
-  "scripts": {
-    "start": "electron .",
-    "test": "mocha tests/**/*.test.js"
-  },
-  "dependencies": {
-    "better-sqlite3": "^11.0.0",
-    "electron": "^30.0.0"
-  },
-  "devDependencies": {
-    "mocha": "^10.4.0"
-  }
-}
-```
-
-Create `main.js`:
-```javascript
-const { app, BrowserWindow, ipcMain } = require('electron');
-const path = require('path');
-
-function createWindow() {
-  const win = new BrowserWindow({
-    width: 1200,
-    height: 800,
-    webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
-      contextIsolation: true,
-      nodeIntegration: false
-    }
-  });
-  win.loadFile('index.html');
-}
-
-app.whenReady().then(createWindow);
-
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit();
-});
-```
-
-Create `preload.js`:
-```javascript
-const { contextBridge, ipcRenderer } = require('electron');
-contextBridge.exposeInMainWorld('api', {
-  send: (channel, data) => ipcRenderer.send(channel, data),
-  invoke: (channel, data) => ipcRenderer.invoke(channel, data),
-  on: (channel, func) => ipcRenderer.on(channel, (event, ...args) => func(...args))
-});
-```
-
-Create `index.html`:
-```html
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <title>StaffPass Local OCR Hub</title>
-  <link rel="stylesheet" href="index.css">
-</head>
-<body>
-  <h1>StaffPass Local OCR Hub</h1>
-  <div id="app">Ready.</div>
-  <script src="renderer.js"></script>
-</body>
-</html>
-```
-
-Create `index.css`:
-```css
-body {
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  background-color: #1e1e1e;
-  color: #ffffff;
-  margin: 0;
-  padding: 20px;
-}
-```
-
-Create `renderer.js`:
-```javascript
-console.log('Renderer initialized');
-```
-
-- [ ] **Step 4: Run test to verify it passes**
-Run: `npm install && npm test`
-Expected: PASS
-
-- [ ] **Step 5: Commit**
-```bash
-git add package.json main.js preload.js renderer.js index.html index.css tests/electron.test.js
-git commit -m "feat: initialize electron app boilerplate"
-```
+| Priority | Task Description | Target File | Status | Notes |
+| :--- | :--- | :--- | :--- | :--- |
+| 🔴 **Critical** | Implement focus traversal helper `focusNextField` | `renderer/dom.js` | ⬜ **Pending** | Focus next field on `Enter` (non-textarea inputs). |
+| 🔴 **Critical** | Integrate auto-advance selection inside `saveSelectedReview` | `renderer/review.js` | ⬜ **Pending** | Programmatically select next pending file and set focus. |
+| 🟠 **High** | Add keydown listener router `handleReviewKeyDown` | `renderer.js` | ⬜ **Pending** | Intercept `Ctrl+Enter`, `Ctrl+Backspace`, `Ctrl+S`, and `Alt+Up/Down`. |
+| 🟠 **High** | Add visual keyboard shortcut hints in UI markup | `index.html` | ⬜ **Pending** | Add visual badges or hints next to action buttons and rows. |
+| 🟢 **Low** | Add comprehensive keyboard regression unit tests | `tests/renderer.test.js` | ⬜ **Pending** | Test keyboard navigation and actions. |
 
 ---
 
-### Task 2: SQLite Schema Setup
+## 2. Detailed Technical Steps
 
-**Files:**
-- Create: `database.js`
-- Create: `tests/database.test.js`
+### Step 1: Form Focus Traversal (`renderer/dom.js`)
+- Write a function `focusNextField(currentField)`:
+  - Define an array of form field IDs in sequence:
+    `['field-first-name', 'field-last-name', 'field-doc-type', 'field-id-number', 'field-expiry-date', 'field-phone-number', 'correction-notes']`
+  - Find the index of `currentField.id`. If found, focus the element at `index + 1`.
+  - Export this helper.
 
-- [ ] **Step 1: Write the failing test**
-Create `tests/database.test.js`:
-```javascript
-const assert = require('assert');
-const fs = require('fs');
-const db = require('../database');
+### Step 2: Auto-Advance Logic (`renderer/review.js`)
+- Modify `saveSelectedReview(reviewStatus)`:
+  - After a successful review save, scan `state.queue` for the next file that needs review (status is `queued`, `review`, or `error`).
+  - If a file is found, update `state.selectedId = nextItem.id`.
+  - If no files are left, set `state.selectedId = null`.
+  - Re-render the view by calling the callback.
+  - Set a brief timeout (e.g. 50ms) to call `.focus()` on `field-first-name` of the newly active document.
 
-describe('Database Schema', () => {
-  before(() => {
-    db.init(':memory:');
-  });
+### Step 3: Keydown Router (`renderer.js`)
+- In `renderer.js`, implement `handleReviewKeyDown(event)`:
+  - Check if `state.activeView === 'review'`.
+  - Ensure overlays (`whats-new-overlay`, `shortcuts-overlay`) are hidden.
+  - Listen for:
+    - `Ctrl + Enter` -> call `saveSelectedReview('Approved')`.
+    - `Ctrl + Backspace` -> call `saveSelectedReview('Rejected')`.
+    - `Ctrl + S` -> call `saveSelectedReview('Corrected')`.
+    - `Alt + ArrowDown` / `Alt + ArrowUp` -> change selected row in `state.queue`.
+    - `Enter` (on form inputs) -> call `focusNextField(event.target)`.
 
-  it('should create staff, documents, and audit_logs tables', () => {
-    const tables = db.getTables();
-    assert.ok(tables.includes('staff'));
-    assert.ok(tables.includes('documents'));
-    assert.ok(tables.includes('audit_logs'));
-  });
-});
-```
-
-- [ ] **Step 2: Run test to verify it fails**
-Run: `npm test`
-Expected: FAIL (database.js empty or missing method)
-
-- [ ] **Step 3: Write database setup implementation**
-Create `database.js`:
-```javascript
-const Database = require('better-sqlite3');
-let db;
-
-function init(dbPath = 'staffpass.db') {
-  db = new Database(dbPath);
-  db.pragma('foreign_keys = ON');
-
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS staff (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      first_name TEXT NOT NULL,
-      last_name TEXT NOT NULL,
-      phone_number TEXT,
-      overall_status TEXT DEFAULT 'Pending Review',
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-
-    CREATE TABLE IF NOT EXISTS documents (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      staff_id INTEGER REFERENCES staff(id) ON DELETE CASCADE,
-      doc_type TEXT NOT NULL,
-      doc_number TEXT NOT NULL,
-      expiry_date TEXT,
-      confidence_score INTEGER DEFAULT 0,
-      file_path TEXT NOT NULL,
-      review_status TEXT DEFAULT 'Pending Review',
-      uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-
-    CREATE TABLE IF NOT EXISTS audit_logs (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      event_type TEXT NOT NULL,
-      details TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-  `);
-}
-
-function getTables() {
-  const rows = db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all();
-  return rows.map(r => r.name);
-}
-
-module.exports = { init, getTables };
-```
-
-- [ ] **Step 4: Run test to verify it passes**
-Run: `npm test`
-Expected: PASS
-
-- [ ] **Step 5: Commit**
-```bash
-git add database.js tests/database.test.js
-git commit -m "feat: setup sqlite tables schema and initialization helper"
-```
+### Step 4: UI Visual Affordances (`index.html`)
+- Locate action buttons (`approve-btn`, `reject-btn`, `save-corrections-btn`).
+- Append small visual text badges showing the shortcuts:
+  - `Approve` -> add `<span class="kbd-badge">Ctrl+Enter</span>` or similar.
+  - `Reject` -> add `<span class="kbd-badge">Ctrl+Backspace</span>`.
+  - `Save Corrections` -> add `<span class="kbd-badge">Ctrl+S</span>`.
+- Style badges in `index.css`.
 
 ---
 
-### Task 3: Python OCR Sidecar interface and BaseVLMAdapter
+## 3. Verification Plan
 
-**Files:**
-- Create: `sidecar/base_adapter.py`
-- Create: `sidecar/mock_adapter.py`
-- Create: `sidecar/ocr_sidecar.py`
-- Create: `sidecar/requirements.txt`
-- Create: `sidecar/tests/test_sidecar.py`
-
-- [ ] **Step 1: Write the failing test**
-Create `sidecar/tests/test_sidecar.py`:
-```python
-import unittest
-import json
-from sidecar.mock_adapter import MockAdapter
-
-class TestOCRAdapter(unittest.TestCase):
-    def test_mock_extraction(self):
-        adapter = MockAdapter()
-        adapter.load()
-        result = adapter.extract_metadata("test_passport.jpg")
-        self.assertEqual(result["first_name"], "JOHN")
-        self.assertEqual(result["doc_type"], "PASSPORT")
-        adapter.unload()
-```
-
-- [ ] **Step 2: Run test to verify it fails**
-Run: `python -m unittest sidecar/tests/test_sidecar.py`
-Expected: FAIL (missing files)
-
-- [ ] **Step 3: Write Python OCR Sidecar code**
-Create `sidecar/base_adapter.py`:
-```python
-class BaseVLMAdapter:
-    def load(self):
-        pass
-    def extract_metadata(self, file_path: str) -> dict:
-        raise NotImplementedError()
-    def unload(self):
-        pass
-```
-
-Create `sidecar/mock_adapter.py`:
-```python
-from .base_adapter import BaseVLMAdapter
-
-class MockAdapter(BaseVLMAdapter):
-    def load(self):
-        pass
-    def extract_metadata(self, file_path: str) -> dict:
-        return {
-            "first_name": "JOHN",
-            "last_name": "SMITH",
-            "doc_type": "PASSPORT",
-            "doc_number": "A1234567",
-            "expiry_date": "2030-12-31",
-            "confidence_score": 98,
-            "phone_number": "+971501234567"
-        }
-    def unload(self):
-        pass
-```
-
-Create `sidecar/ocr_sidecar.py`:
-```python
-import sys
-import json
-from mock_adapter import MockAdapter
-
-def main():
-    # Loop reading JSON commands from stdin
-    # Command shape: {"action": "ocr", "file_path": "path"}
-    adapter = MockAdapter()
-    adapter.load()
-    try:
-        for line in sys.stdin:
-            if not line.strip():
-                continue
-            cmd = json.loads(line)
-            action = cmd.get("action")
-            if action == "ocr":
-                fp = cmd.get("file_path")
-                data = adapter.extract_metadata(fp)
-                print(json.dumps({"status": "success", "data": data}))
-            elif action == "exit":
-                break
-            sys.stdout.flush()
-    finally:
-        adapter.unload()
-
-if __name__ == "__main__":
-    main()
-```
-
-Create `sidecar/requirements.txt`:
-```text
-pillow>=10.0.0
-```
-
-- [ ] **Step 4: Run test to verify it passes**
-Run: `python -m unittest sidecar/tests/test_sidecar.py`
-Expected: PASS
-
-- [ ] **Step 5: Commit**
-```bash
-git add sidecar/
-git commit -m "feat: implement Python OCR Sidecar and MockAdapter"
-```
-
----
-
-### Task 4: IPC Bridge between Electron and Python OCR Sidecar
-
-**Files:**
-- Create: `sidecar_bridge.js`
-- Create: `tests/sidecar_bridge.test.js`
-- Modify: `main.js`
-
-- [ ] **Step 1: Write the failing test**
-Create `tests/sidecar_bridge.test.js` to ensure the bridge launches Python subprocess and receives JSON output.
-```javascript
-const assert = require('assert');
-const path = require('path');
-const bridge = require('../sidecar_bridge');
-
-describe('OCR Sidecar Bridge', () => {
-  it('should process OCR task and return mock data', async () => {
-    const result = await bridge.runOCR('dummy.jpg');
-    assert.strictEqual(result.first_name, 'JOHN');
-  });
-});
-```
-
-- [ ] **Step 2: Run test to verify it fails**
-Run: `npm test`
-Expected: FAIL (missing bridge module)
-
-- [ ] **Step 3: Implement sidecar bridge**
-Create `sidecar_bridge.js`:
-```javascript
-const { spawn } = require('child_process');
-const path = require('path');
-
-let child = null;
-
-function getChild() {
-  if (!child) {
-    const scriptPath = path.join(__dirname, 'sidecar', 'ocr_sidecar.py');
-    child = spawn('python', [scriptPath]);
-    child.stderr.on('data', (data) => {
-      console.error(`python error: ${data}`);
-    });
-  }
-  return child;
-}
-
-function runOCR(filePath) {
-  return new Promise((resolve, reject) => {
-    const py = getChild();
-    const onData = (data) => {
-      py.stdout.removeListener('data', onData);
-      try {
-        const res = JSON.parse(data.toString());
-        if (res.status === 'success') {
-          resolve(res.data);
-        } else {
-          reject(new Error(res.message || 'OCR failed'));
-        }
-      } catch (err) {
-        reject(err);
-      }
-    };
-    py.stdout.on('data', onData);
-    py.stdin.write(JSON.stringify({ action: 'ocr', file_path: filePath }) + '\n');
-  });
-}
-
-function stop() {
-  if (child) {
-    child.stdin.write(JSON.stringify({ action: 'exit' }) + '\n');
-    child.kill();
-    child = null;
-  }
-}
-
-module.exports = { runOCR, stop };
-```
-
-Modify `main.js` to register the IPC listener and call stop on exit:
-```javascript
-// Add:
-const bridge = require('./sidecar_bridge');
-
-// Add before app.whenReady().then(createWindow):
-ipcMain.handle('ocr:process', async (event, filePath) => {
-  return await bridge.runOCR(filePath);
-});
-
-app.on('will-quit', () => {
-  bridge.stop();
-});
-```
-
-- [ ] **Step 4: Run test to verify it passes**
-Run: `npm test`
-Expected: PASS
-
-- [ ] **Step 5: Commit**
-```bash
-git add sidecar_bridge.js main.js tests/sidecar_bridge.test.js
-git commit -m "feat: bridge electron with Python OCR sidecar"
-```
+1. **Running Tests**:
+   - Run `npm test` to verify all baseline tests are passing.
+   - Run unit tests specifically testing keyboard actions in `tests/renderer.test.js`.
+2. **Manual Smoke Check**:
+   - Start Electron using `npm start`.
+   - Add files, run OCR, navigate the inspector fields using `Enter`/`Tab`, and approve/reject using the keyboard hotkeys. Check if it advances smoothly.
