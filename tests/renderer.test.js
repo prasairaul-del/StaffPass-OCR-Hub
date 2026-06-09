@@ -762,3 +762,54 @@ describe('Window unhandledrejection listener', () => {
     assert.ok(toastEl.textContent.includes('Simulated async failure'), 'Toast message should contain error details');
   });
 });
+
+describe('Window drag and drop logic', () => {
+  it('should handle dragenter, dragleave and drop events on window', () => {
+    const localSandbox = loadRendererInternals();
+    
+    // Define mock element for drag-overlay
+    const dragOverlay = makeFakeElement('div');
+    dragOverlay.style.display = 'none';
+    localSandbox.document.elements.set('drag-overlay', dragOverlay);
+
+    // Track calls to addFiles
+    let addedFiles = [];
+    localSandbox.addFiles = (files) => {
+      addedFiles = files;
+    };
+
+    const bindEvents = localSandbox.module.exports.__test__.bindEvents;
+    bindEvents(() => {});
+
+    // Check listeners are registered on window
+    const dragenter = localSandbox.window.listeners['dragenter'];
+    const dragleave = localSandbox.window.listeners['dragleave'];
+    const drop = localSandbox.window.listeners['drop'];
+
+    assert.ok(dragenter, 'dragenter listener registered');
+    assert.ok(dragleave, 'dragleave listener registered');
+    assert.ok(drop, 'drop listener registered');
+
+    // Simulate dragenter
+    dragenter({ preventDefault() {} });
+    assert.strictEqual(dragOverlay.style.display, 'flex');
+
+    // Simulate dragleave (counter decreases to 0)
+    dragleave({ preventDefault() {} });
+    assert.strictEqual(dragOverlay.style.display, 'none');
+
+    // Simulate dragenter and drop
+    dragenter({ preventDefault() {} });
+    assert.strictEqual(dragOverlay.style.display, 'flex');
+
+    const fakeFiles = [{ name: 'doc.png' }];
+    drop({
+      preventDefault() {},
+      dataTransfer: { files: fakeFiles }
+    });
+
+    assert.strictEqual(dragOverlay.style.display, 'none');
+    assert.strictEqual(addedFiles.length, 1);
+    assert.strictEqual(addedFiles[0].name, 'doc.png');
+  });
+});

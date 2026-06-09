@@ -203,6 +203,36 @@ export function bindEvents(render) {
     });
   }
 
+  let dragCounter = 0;
+  window.addEventListener('dragenter', (event) => {
+    event.preventDefault();
+    dragCounter++;
+    const overlay = query('drag-overlay');
+    if (overlay) overlay.style.display = 'flex';
+  });
+
+  window.addEventListener('dragover', (event) => {
+    event.preventDefault();
+  });
+
+  window.addEventListener('dragleave', (event) => {
+    dragCounter--;
+    if (dragCounter <= 0) {
+      dragCounter = 0;
+      const overlay = query('drag-overlay');
+      if (overlay) overlay.style.display = 'none';
+    }
+  });
+
+  window.addEventListener('drop', (event) => {
+    event.preventDefault();
+    dragCounter = 0;
+    const overlay = query('drag-overlay');
+    if (overlay) overlay.style.display = 'none';
+    const files = Array.from(event.dataTransfer?.files || []);
+    if (files.length > 0) addFiles(files);
+  });
+
   // Global document events
   document.addEventListener('keydown', (event) => {
     handleReviewKeyDown(event, render);
