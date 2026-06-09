@@ -14,6 +14,18 @@ else:
     from .pdf_preview import render_first_page_pdf_preview
 
 
+def validate_payload(payload):
+    if not isinstance(payload, dict):
+        raise ValueError("Payload must be a JSON object")
+    action = payload.get("action")
+    if not action or action not in ("ocr", "preview", "exit"):
+        raise ValueError("Invalid or missing action")
+    if action in ("ocr", "preview"):
+        file_path = payload.get("file_path")
+        if not file_path or not isinstance(file_path, str):
+            raise ValueError("Missing or invalid file_path")
+
+
 def main():
     engine = os.environ.get("OCR_ENGINE", "mock").lower()
     if engine == "glm-ocr":
@@ -27,6 +39,7 @@ def main():
                 continue
             try:
                 cmd = json.loads(line)
+                validate_payload(cmd)
                 action = cmd.get("action")
                 if action == "ocr":
                     file_path = cmd.get("file_path")

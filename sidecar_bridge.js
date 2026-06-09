@@ -35,6 +35,20 @@ function resolvePython() {
 
   return 'python';
 }
+function validatePayload(payload) {
+  if (!payload || typeof payload !== 'object') {
+    throw new Error('Payload must be an object');
+  }
+  if (!payload.action || !['ocr', 'preview', 'exit'].includes(payload.action)) {
+    throw new Error('Invalid action');
+  }
+  if (['ocr', 'preview'].includes(payload.action)) {
+    if (!payload.file_path || typeof payload.file_path !== 'string') {
+      throw new Error('Missing or invalid file_path');
+    }
+  }
+}
+
 
 function startChild() {
   const scriptPath = path.join(getSidecarDir(), 'ocr_sidecar.py');
@@ -61,9 +75,49 @@ function startChild() {
   });
 
   child.on('exit', (code, signal) => {
-    const error = new Error(`OCR sidecar exited with code ${code ?? 'null'} and signal ${signal ?? 'null'}`);
     child = null;
     buffer = '';
+
+    // If premature exit (non-zero code, or while we had active requests and signal)
+    if ((code !== 0 || signal !== null) && pending.length > 0) {
+      const retryable = [];
+      const nonRetryable = [];
+      pending.forEach((req) => {
+        req.attempts = (req.attempts || 0) + 1;
+        if (req.attempts < 3) {
+          retryable.push(req);
+        } else {
+          nonRetryable.push(req);
+        }
+      });
+
+      nonRetryable.forEach((req) => {
+        removeRequest(req);
+        clearTimeout(req.timeout);
+        req.reject(new Error(`OCR sidecar exited with code ${code ?? 'null'} and signal ${signal ?? 'null'}`));
+      });
+
+      if (retryable.length > 0) {
+        console.warn(`OCR sidecar exited unexpectedly (code: ${code}, signal: ${signal}). Attempting auto-restart...`);
+        try {
+          const newChild = getChild();
+          retryable.forEach((req) => {
+            newChild.stdin.write(`${JSON.stringify(req.payload)}\n`, (err) => {
+              if (err) {
+                removeRequest(req);
+                clearTimeout(req.timeout);
+                req.reject(err);
+              }
+            });
+          });
+          return;
+        } catch (err) {
+          console.error('Failed to auto-restart OCR sidecar:', err);
+        }
+      }
+    }
+
+    const error = new Error(`OCR sidecar exited with code ${code ?? 'null'} and signal ${signal ?? 'null'}`);
     rejectPending(error);
   });
 
@@ -126,10 +180,17 @@ function normalizeOcrResponse(data) {
 
 function runOCR(filePath) {
   return new Promise((resolve, reject) => {
+    const payload = { action: 'ocr', file_path: filePath };
+    try {
+      validatePayload(payload);
+    } catch (validationError) {
+      return reject(validationError);
+    }
     const py = getChild();
     const timeoutMs = Number(process.env.OCR_TIMEOUT_MS || DEFAULT_TIMEOUT_MS);
     const request = {
       type: 'ocr',
+      payload,
       resolve,
       reject,
       timeout: setTimeout(() => {
@@ -139,7 +200,7 @@ function runOCR(filePath) {
     };
 
     pending.push(request);
-    py.stdin.write(`${JSON.stringify({ action: 'ocr', file_path: filePath })}\n`, (error) => {
+    py.stdin.write(`${JSON.stringify(payload)}\n`, (error) => {
       if (!error) return;
       removeRequest(request);
       clearTimeout(request.timeout);
@@ -155,7 +216,13 @@ function stop() {
   child = null;
   buffer = '';
 
-  py.stdin.write(`${JSON.stringify({ action: 'exit' })}\n`);
+  const payload = { action: 'exit' };
+  try {
+    validatePayload(payload);
+    py.stdin.write(`${JSON.stringify(payload)}\n`);
+  } catch (err) {
+    console.error('Failed to send exit action:', err);
+  }
   setTimeout(() => {
     try {
       if (py.exitCode === null) {
@@ -219,10 +286,17 @@ function downloadModel(onProgress) {
 
 function previewPdfPage(filePath) {
   return new Promise((resolve, reject) => {
+    const payload = { action: 'preview', file_path: filePath };
+    try {
+      validatePayload(payload);
+    } catch (validationError) {
+      return reject(validationError);
+    }
     const py = getChild();
     const timeoutMs = Number(process.env.PDF_PREVIEW_TIMEOUT_MS || DEFAULT_TIMEOUT_MS);
     const request = {
       type: 'preview',
+      payload,
       resolve,
       reject,
       timeout: setTimeout(() => {
@@ -232,7 +306,7 @@ function previewPdfPage(filePath) {
     };
 
     pending.push(request);
-    py.stdin.write(`${JSON.stringify({ action: 'preview', file_path: filePath })}\n`, (error) => {
+    py.stdin.write(`${JSON.stringify(payload)}\n`, (error) => {
       if (!error) return;
       removeRequest(request);
       clearTimeout(request.timeout);

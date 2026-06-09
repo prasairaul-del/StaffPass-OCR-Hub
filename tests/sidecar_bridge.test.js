@@ -116,4 +116,72 @@ describe('OCR Sidecar Bridge', () => {
       bridge.stop();
     }
   });
+
+  it('should attempt to auto-restart the sidecar if it exits prematurely during active requests', async () => {
+    const child_process = require('child_process');
+    const originalSpawn = child_process.spawn;
+
+    let spawnCount = 0;
+    let mockChild = null;
+
+    child_process.spawn = function(command, args, options) {
+      spawnCount++;
+      const listeners = {};
+      const mockStdin = {
+        write: (data, callback) => {
+          if (callback) callback();
+        }
+      };
+      const mockStdout = {
+        on: (event, cb) => {}
+      };
+      const mockStderr = {
+        on: (event, cb) => {}
+      };
+      const childObj = {
+        stdin: mockStdin,
+        stdout: mockStdout,
+        stderr: mockStderr,
+        on: (event, cb) => {
+          listeners[event] = cb;
+        },
+        kill: () => {},
+        exitCode: null,
+        trigger: (event, ...args) => {
+          if (listeners[event]) listeners[event](...args);
+        }
+      };
+      mockChild = childObj;
+      return childObj;
+    };
+
+    // Clear cache and require sidecar_bridge fresh to pick up overridden spawn
+    delete require.cache[require.resolve('../sidecar_bridge')];
+    const freshBridge = require('../sidecar_bridge');
+
+    try {
+      freshBridge.stop();
+      const promise = freshBridge.runOCR('dummy.jpg');
+      promise.catch(() => {});
+      assert.strictEqual(spawnCount, 1);
+      
+      mockChild.trigger('exit', 1, null);
+      assert.strictEqual(spawnCount, 2);
+    } finally {
+      child_process.spawn = originalSpawn;
+      delete require.cache[require.resolve('../sidecar_bridge')];
+    }
+  });
+
+  it('should reject payloads with invalid structure on JS side', async () => {
+    await assert.rejects(
+      () => bridge.runOCR(null),
+      /Missing or invalid file_path/
+    );
+
+    await assert.rejects(
+      () => bridge.runOCR({}),
+      /Missing or invalid file_path/
+    );
+  });
 });
