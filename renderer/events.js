@@ -91,40 +91,48 @@ export function handleReviewKeyDown(event, render) {
 }
 
 export function bindEvents(render) {
-  query('tab-ingestion')?.addEventListener('click', () => {
+  const registered = [];
+  
+  function add(target, event, handler) {
+    if (!target) return;
+    target.addEventListener(event, handler);
+    registered.push({ target, event, handler });
+  }
+
+  add(query('tab-ingestion'), 'click', () => {
     setActiveView('ingestion');
     render();
   });
-  query('tab-review-queue')?.addEventListener('click', () => {
+  add(query('tab-review-queue'), 'click', () => {
     setActiveView('review');
     render();
   });
-  query('tab-records')?.addEventListener('click', () => {
+  add(query('tab-records'), 'click', () => {
     setActiveView('records');
     render();
   });
-  query('process-selected')?.addEventListener('click', processSelectedOCR);
-  query('clear-queue-btn')?.addEventListener('click', () => {
+  add(query('process-selected'), 'click', processSelectedOCR);
+  add(query('clear-queue-btn'), 'click', () => {
     state.queue = [];
     state.selectedId = null;
     setStatus('Queue cleared.');
     render();
   });
-  query('refresh-queue-btn')?.addEventListener('click', async () => {
+  add(query('refresh-queue-btn'), 'click', async () => {
     await loadRecords();
     render();
     setStatus('Workspace refreshed.');
   });
-  query('refresh-records')?.addEventListener('click', async () => {
+  add(query('refresh-records'), 'click', async () => {
     await loadRecords();
     render();
     setStatus('Records refreshed.');
   });
-  query('export-records-btn')?.addEventListener('click', exportRecords);
-  query('approve-btn')?.addEventListener('click', () => saveSelectedReview('Approved'));
-  query('reject-btn')?.addEventListener('click', () => saveSelectedReview('Rejected'));
-  query('correct-btn')?.addEventListener('click', () => saveSelectedReview('Corrected'));
-  query('save-corrections-btn')?.addEventListener('click', () => saveSelectedReview('Corrected'));
+  add(query('export-records-btn'), 'click', exportRecords);
+  add(query('approve-btn'), 'click', () => saveSelectedReview('Approved'));
+  add(query('reject-btn'), 'click', () => saveSelectedReview('Rejected'));
+  add(query('correct-btn'), 'click', () => saveSelectedReview('Corrected'));
+  add(query('save-corrections-btn'), 'click', () => saveSelectedReview('Corrected'));
 
   const searchInput = query('record-search-input');
   const spinner = query('search-spinner');
@@ -138,20 +146,20 @@ export function bindEvents(render) {
     }
   }, 250);
 
-  searchInput?.addEventListener('input', () => {
+  add(searchInput, 'input', () => {
     if (spinner) {
       spinner.classList.add('is-searching');
     }
     debouncedSearch();
   });
 
-  query('record-type-filter')?.addEventListener('change', async () => {
+  add(query('record-type-filter'), 'change', async () => {
     state.pagination.page = 1;
     await loadRecords();
     renderRecords();
   });
 
-  query('records-prev-page')?.addEventListener('click', async () => {
+  add(query('records-prev-page'), 'click', async () => {
     if (state.pagination.page > 1) {
       state.pagination.page -= 1;
       await loadRecords();
@@ -159,7 +167,7 @@ export function bindEvents(render) {
     }
   });
 
-  query('records-next-page')?.addEventListener('click', async () => {
+  add(query('records-next-page'), 'click', async () => {
     const totalPages = Math.ceil(state.pagination.total / state.pagination.limit);
     if (state.pagination.page < totalPages) {
       state.pagination.page += 1;
@@ -168,20 +176,20 @@ export function bindEvents(render) {
     }
   });
 
-  query('records-page-size')?.addEventListener('change', async (event) => {
+  add(query('records-page-size'), 'change', async (event) => {
     state.pagination.limit = Number(event.target.value);
     state.pagination.page = 1;
     await loadRecords();
     renderRecords();
   });
 
-  query('file-input')?.addEventListener('change', (event) => {
+  add(query('file-input'), 'change', (event) => {
     const files = Array.from(event.target.files || []);
     if (files.length > 0) addFiles(files);
     event.target.value = '';
   });
 
-  query('drop-zone')?.addEventListener('keydown', (event) => {
+  add(query('drop-zone'), 'keydown', (event) => {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
       selectDocuments();
@@ -190,12 +198,12 @@ export function bindEvents(render) {
 
   const dropZone = query('drop-zone');
   if (dropZone) {
-    dropZone.addEventListener('dragover', (event) => {
+    add(dropZone, 'dragover', (event) => {
       event.preventDefault();
       dropZone.classList.add('is-dragging');
     });
-    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('is-dragging'));
-    dropZone.addEventListener('drop', (event) => {
+    add(dropZone, 'dragleave', () => dropZone.classList.remove('is-dragging'));
+    add(dropZone, 'drop', (event) => {
       event.preventDefault();
       dropZone.classList.remove('is-dragging');
       const files = Array.from(event.dataTransfer.files || []);
@@ -204,18 +212,18 @@ export function bindEvents(render) {
   }
 
   let dragCounter = 0;
-  window.addEventListener('dragenter', (event) => {
+  add(window, 'dragenter', (event) => {
     event.preventDefault();
     dragCounter++;
     const overlay = query('drag-overlay');
     if (overlay) overlay.style.display = 'flex';
   });
 
-  window.addEventListener('dragover', (event) => {
+  add(window, 'dragover', (event) => {
     event.preventDefault();
   });
 
-  window.addEventListener('dragleave', (event) => {
+  add(window, 'dragleave', (event) => {
     dragCounter--;
     if (dragCounter <= 0) {
       dragCounter = 0;
@@ -224,7 +232,7 @@ export function bindEvents(render) {
     }
   });
 
-  window.addEventListener('drop', (event) => {
+  add(window, 'drop', (event) => {
     event.preventDefault();
     dragCounter = 0;
     const overlay = query('drag-overlay');
@@ -233,8 +241,16 @@ export function bindEvents(render) {
     if (files.length > 0) addFiles(files);
   });
 
+  const handleBlurOrDragend = () => {
+    dragCounter = 0;
+    const overlay = query('drag-overlay');
+    if (overlay) overlay.style.display = 'none';
+  };
+  add(window, 'blur', handleBlurOrDragend);
+  add(window, 'dragend', handleBlurOrDragend);
+
   // Global document events
-  document.addEventListener('keydown', (event) => {
+  add(document, 'keydown', (event) => {
     handleReviewKeyDown(event, render);
     
     if (event.ctrlKey && event.shiftKey && event.key === 'D') {
@@ -290,14 +306,20 @@ export function bindEvents(render) {
     }
   });
 
-  query('theme-toggle')?.addEventListener('click', toggleTheme);
-  query('shortcuts-close')?.addEventListener('click', toggleShortcutsOverlay);
-  query('whats-new-close')?.addEventListener('click', dismissWhatsNew);
-  query('whats-new-dismiss')?.addEventListener('click', dismissWhatsNew);
-  query('whats-new-overlay')?.addEventListener('click', (event) => {
+  add(query('theme-toggle'), 'click', toggleTheme);
+  add(query('shortcuts-close'), 'click', toggleShortcutsOverlay);
+  add(query('whats-new-close'), 'click', dismissWhatsNew);
+  add(query('whats-new-dismiss'), 'click', dismissWhatsNew);
+  add(query('whats-new-overlay'), 'click', (event) => {
     if (event.target.classList.contains('shortcuts-backdrop')) dismissWhatsNew();
   });
-  query('shortcuts-overlay')?.addEventListener('click', (event) => {
+  add(query('shortcuts-overlay'), 'click', (event) => {
     if (event.target.classList.contains('shortcuts-backdrop')) toggleShortcutsOverlay();
   });
+
+  return function cleanup() {
+    registered.forEach(({ target, event, handler }) => {
+      target.removeEventListener(event, handler);
+    });
+  };
 }

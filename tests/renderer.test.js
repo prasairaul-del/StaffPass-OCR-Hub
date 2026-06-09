@@ -40,6 +40,11 @@ function makeFakeElement(tagName = 'div') {
     addEventListener: (eventName, handler) => {
       listeners[eventName] = handler;
     },
+    removeEventListener: (eventName, handler) => {
+      if (listeners[eventName] === handler) {
+        delete listeners[eventName];
+      }
+    },
     trigger: (eventName, eventObj) => {
       if (listeners[eventName]) {
         return listeners[eventName](eventObj || { preventDefault() {}, target: element });
@@ -109,9 +114,15 @@ function loadRendererInternals() {
       addEventListener(eventName, handler) {
         this.listeners[eventName] = handler;
       },
+      removeEventListener(eventName, handler) {
+        if (this.listeners[eventName] === handler) {
+          delete this.listeners[eventName];
+        }
+      },
       api: {}
     },
     document: {
+      listeners: {},
       elements: new Map(),
       documentElement: {
         setAttribute: () => {},
@@ -121,7 +132,14 @@ function loadRendererInternals() {
         appendChild: () => {}
       },
       activeElement: null,
-      addEventListener: () => {},
+      addEventListener(eventName, handler) {
+        this.listeners[eventName] = handler;
+      },
+      removeEventListener(eventName, handler) {
+        if (this.listeners[eventName] === handler) {
+          delete this.listeners[eventName];
+        }
+      },
       createElement: (tagName) => makeFakeElement(tagName),
       getElementById(id) {
         return this.elements.get(id) || null;
@@ -824,7 +842,7 @@ describe('Window error and unhandledrejection listeners', () => {
 });
 
 describe('Window drag and drop logic', () => {
-  it('should handle dragenter, dragleave and drop events on window', () => {
+  it('should handle dragenter, dragleave, drop, blur, dragend, and cleanup on window', () => {
     const localSandbox = loadRendererInternals();
     
     // Define mock element for drag-overlay
@@ -839,16 +857,20 @@ describe('Window drag and drop logic', () => {
     };
 
     const bindEvents = localSandbox.module.exports.__test__.bindEvents;
-    bindEvents(() => {});
+    const cleanup = bindEvents(() => {});
 
     // Check listeners are registered on window
     const dragenter = localSandbox.window.listeners['dragenter'];
     const dragleave = localSandbox.window.listeners['dragleave'];
     const drop = localSandbox.window.listeners['drop'];
+    const blur = localSandbox.window.listeners['blur'];
+    const dragend = localSandbox.window.listeners['dragend'];
 
     assert.ok(dragenter, 'dragenter listener registered');
     assert.ok(dragleave, 'dragleave listener registered');
     assert.ok(drop, 'drop listener registered');
+    assert.ok(blur, 'blur listener registered');
+    assert.ok(dragend, 'dragend listener registered');
 
     // Simulate dragenter
     dragenter({ preventDefault() {} });
@@ -856,6 +878,18 @@ describe('Window drag and drop logic', () => {
 
     // Simulate dragleave (counter decreases to 0)
     dragleave({ preventDefault() {} });
+    assert.strictEqual(dragOverlay.style.display, 'none');
+
+    // Simulate dragenter and blur
+    dragenter({ preventDefault() {} });
+    assert.strictEqual(dragOverlay.style.display, 'flex');
+    blur();
+    assert.strictEqual(dragOverlay.style.display, 'none');
+
+    // Simulate dragenter and dragend
+    dragenter({ preventDefault() {} });
+    assert.strictEqual(dragOverlay.style.display, 'flex');
+    dragend();
     assert.strictEqual(dragOverlay.style.display, 'none');
 
     // Simulate dragenter and drop
@@ -871,5 +905,13 @@ describe('Window drag and drop logic', () => {
     assert.strictEqual(dragOverlay.style.display, 'none');
     assert.strictEqual(addedFiles.length, 1);
     assert.strictEqual(addedFiles[0].name, 'doc.png');
+
+    // Test cleanup
+    cleanup();
+    assert.strictEqual(localSandbox.window.listeners['dragenter'], undefined);
+    assert.strictEqual(localSandbox.window.listeners['dragleave'], undefined);
+    assert.strictEqual(localSandbox.window.listeners['drop'], undefined);
+    assert.strictEqual(localSandbox.window.listeners['blur'], undefined);
+    assert.strictEqual(localSandbox.window.listeners['dragend'], undefined);
   });
 });
