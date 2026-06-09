@@ -184,4 +184,27 @@ describe('OCR Sidecar Bridge', () => {
       /Missing or invalid file_path/
     );
   });
+
+  it('should immediately terminate the sidecar process on request timeout', async () => {
+    delete require.cache[require.resolve('../sidecar_bridge')];
+    const freshBridge = require('../sidecar_bridge');
+    const originalTimeout = process.env.OCR_TIMEOUT_MS;
+    process.env.OCR_TIMEOUT_MS = '20';
+
+    try {
+      await assert.rejects(
+        () => freshBridge.runOCR('dummy.jpg'),
+        /timed out/
+      );
+      assert.strictEqual(freshBridge.isRunning(), false);
+    } finally {
+      if (originalTimeout === undefined) {
+        delete process.env.OCR_TIMEOUT_MS;
+      } else {
+        process.env.OCR_TIMEOUT_MS = originalTimeout;
+      }
+      freshBridge.stop();
+      delete require.cache[require.resolve('../sidecar_bridge')];
+    }
+  });
 });

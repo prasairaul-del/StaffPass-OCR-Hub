@@ -195,6 +195,7 @@ function runOCR(filePath) {
       reject,
       timeout: setTimeout(() => {
         removeRequest(request);
+        stop();
         reject(new Error(`OCR request timed out after ${timeoutMs}ms`));
       }, timeoutMs)
     };
@@ -301,6 +302,7 @@ function previewPdfPage(filePath) {
       reject,
       timeout: setTimeout(() => {
         removeRequest(request);
+        stop();
         reject(new Error(`PDF preview request timed out after ${timeoutMs}ms`));
       }, timeoutMs)
     };
@@ -314,5 +316,13 @@ function previewPdfPage(filePath) {
     });
   });
 }
+
+process.on('exit', () => {
+  if (child) {
+    try {
+      child.kill('SIGKILL');
+    } catch (_err) {}
+  }
+});
 
 module.exports = { runOCR, stop, isRunning, downloadModel, previewPdfPage, normalizeOcrResponse };
