@@ -8,11 +8,11 @@ This implementation plan details the step-by-step tasks required to add search i
 
 | Priority | Task Description | Target File | Status | Notes |
 | :--- | :--- | :--- | :--- | :--- |
-| 🔴 **Critical** | Implement `debounce` utility in `renderer/utils.js` | `renderer/utils.js` | ⬜ **Pending** | Standard debouncer function. |
-| 🔴 **Critical** | Update event listener in `renderer.js` to debounce search | `renderer.js` | ⬜ **Pending** | Integrate spinner toggle and 250ms debounce. |
-| 🟠 **High** | Wrap search input and add visual spinner element in HTML | `index.html` | ⬜ **Pending** | Wrap in relative `.search-wrapper` and add `#search-spinner`. |
-| 🟠 **High** | Add spinner styles and keyframe spin animation in CSS | `index.css` | ⬜ **Pending** | Add `@keyframes spin` and styling for `.search-spinner`. |
-| 🟢 **Low** | Add debounce unit tests | `tests/renderer.test.js` | ⬜ **Pending** | Test debounce timeout behavior and throttling. |
+| 🔴 **Critical** | Implement `debounce` utility in `renderer/utils.js` | `renderer/utils.js` | ✅ **Completed** | Standard debouncer function. |
+| 🔴 **Critical** | Update event listener in `renderer.js` to debounce search | `renderer.js` | ✅ **Completed** | Integrate spinner toggle and 250ms debounce. |
+| 🟠 **High** | Wrap search input and add visual spinner element in HTML | `index.html` | ✅ **Completed** | Wrap in relative `.search-wrapper` and add `#search-spinner`. |
+| 🟠 **High** | Add spinner styles and keyframe spin animation in CSS | `index.css` | ✅ **Completed** | Add `@keyframes spin` and styling for `.search-spinner`. |
+| 🟢 **Low** | Add debounce unit tests | `tests/renderer.test.js` | ✅ **Completed** | Test debounce timeout behavior and throttling. |
 
 ---
 
