@@ -137,7 +137,7 @@ function loadRendererInternals() {
   sandbox.global = sandbox;
   sandbox.globalThis = sandbox;
 
-  const exposedSource = `${source}\nmodule.exports.__test__ = { bindEvents, dismissWhatsNew, enforceOverlayFocus, getExtractionNotes, getReviewStatusForExtraction, keepFocusInsideOverlay, showWhatsNewDialog, updateDocumentPreview, handleReviewKeyDown, focusNextField, state, loadRecords, renderRecords, updatePaginationUI };\nmodule.exports.createQueueItem = createQueueItem;\nmodule.exports.getConfidenceStatus = getConfidenceStatus;\nmodule.exports.createConfidenceBadge = createConfidenceBadge;\nmodule.exports.normalizeExtraction = normalizeExtraction;\nmodule.exports.validateReviewData = validateReviewData;\nmodule.exports.debounce = debounce;`;
+  const exposedSource = `${source}\nmodule.exports.__test__ = { bindEvents, dismissWhatsNew, enforceOverlayFocus, getExtractionNotes, getReviewStatusForExtraction, keepFocusInsideOverlay, showWhatsNewDialog, updateDocumentPreview, handleReviewKeyDown, focusNextField, state, loadRecords, renderRecords, updatePaginationUI };\nmodule.exports.createQueueItem = createQueueItem;\nmodule.exports.getConfidenceStatus = getConfidenceStatus;\nmodule.exports.createConfidenceBadge = createConfidenceBadge;\nmodule.exports.normalizeExtraction = normalizeExtraction;\nmodule.exports.validateReviewData = validateReviewData;\nmodule.exports.debounce = debounce;\nmodule.exports.sanitizeErrorMessage = sanitizeErrorMessage;`;
   
   vm.runInNewContext(exposedSource, sandbox, { filename: path.join(__dirname, '..', 'renderer.js') });
   
@@ -147,6 +147,7 @@ function loadRendererInternals() {
   sandbox.normalizeExtraction = (...args) => JSON.parse(JSON.stringify(sandbox.module.exports.normalizeExtraction(...args)));
   sandbox.validateReviewData = (...args) => JSON.parse(JSON.stringify(sandbox.module.exports.validateReviewData(...args)));
   sandbox.debounce = sandbox.module.exports.debounce;
+  sandbox.sanitizeErrorMessage = sandbox.module.exports.sanitizeErrorMessage;
 
   return sandbox;
 }
@@ -158,7 +159,8 @@ const {
   getConfidenceStatus,
   createConfidenceBadge,
   normalizeExtraction,
-  validateReviewData
+  validateReviewData,
+  sanitizeErrorMessage
 } = sandbox;
 
 describe('Renderer UI Helpers', () => {
@@ -765,7 +767,7 @@ describe('Saved Records Pagination Controls', () => {
   });
 });
 
-describe('Window unhandledrejection listener', () => {
+describe('Window error and unhandledrejection listeners', () => {
   it('should intercept unhandled promise rejections and show a toast with details', () => {
     const localSandbox = loadRendererInternals();
     const listener = localSandbox.window.listeners['unhandledrejection'];
@@ -782,6 +784,42 @@ describe('Window unhandledrejection listener', () => {
 
     assert.ok(toastEl.classList.contains('is-visible'), 'Toast should be visible');
     assert.ok(toastEl.textContent.includes('Simulated async failure'), 'Toast message should contain error details');
+  });
+
+  it('should intercept unhandled errors and show a toast with details', () => {
+    const localSandbox = loadRendererInternals();
+    const listener = localSandbox.window.listeners['error'];
+    assert.ok(listener, 'error listener should be registered');
+
+    const toastEl = makeFakeElement('div');
+    localSandbox.document.elements.set('toast', toastEl);
+
+    listener({
+      message: 'Simulated runtime error',
+      error: new Error('Simulated runtime error')
+    });
+
+    assert.ok(toastEl.classList.contains('is-visible'), 'Toast should be visible');
+    assert.ok(toastEl.textContent.includes('Simulated runtime error'), 'Toast message should contain error details');
+  });
+
+  it('should sanitize paths and SQL statements from error toast messages', () => {
+    const localSandbox = loadRendererInternals();
+    const sanitize = localSandbox.sanitizeErrorMessage;
+    
+    // Windows paths
+    const msg1 = 'Error in C:\\Users\\Name\\file.js: something went wrong';
+    assert.strictEqual(sanitize(msg1), 'Error in : something went wrong');
+
+    // POSIX paths
+    const msg2 = 'Error in /usr/bin/file.js: something went wrong';
+    assert.strictEqual(sanitize(msg2), 'Error in : something went wrong');
+    const msg3 = 'Error in /home/user/project/index.js: something went wrong';
+    assert.strictEqual(sanitize(msg3), 'Error in : something went wrong');
+
+    // SQL statements (using the exact non-greedy regex specified)
+    const msg4 = 'Failed query: SELECT * FROM documents';
+    assert.strictEqual(sanitize(msg4), 'Failed query:  * FROM documents');
   });
 });
 

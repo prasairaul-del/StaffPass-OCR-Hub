@@ -64,12 +64,25 @@ export async function init() {
   render();
 }
 
+export function sanitizeErrorMessage(message) {
+  if (typeof message !== 'string') return '';
+  return message
+    .replace(/[a-zA-Z]:\\[a-zA-Z0-9_\-\.\\]+/g, '')
+    .replace(/\/[a-zA-Z0-9_\-\.]+\/[a-zA-Z0-9_\-\.\/]+|\/usr\/|\/home\//g, '')
+    .replace(/(?:SELECT|INSERT|UPDATE|DELETE|CREATE|DROP)\b[\s\S]*?/gi, '');
+}
+
 if (typeof window !== 'undefined' && typeof document !== 'undefined') {
   window.addEventListener('DOMContentLoaded', init);
+  window.addEventListener('error', (event) => {
+    console.error('Unhandled error:', event.error || event.message);
+    const details = event.error ? (event.error.message || String(event.error)) : (event.message || 'Unknown error');
+    showToast(`An unexpected error occurred: ${sanitizeErrorMessage(details)}`);
+  });
   window.addEventListener('unhandledrejection', (event) => {
     console.error('Unhandled rejection:', event.reason);
     const details = event.reason ? (event.reason.message || String(event.reason)) : 'Unknown error';
-    showToast(`An unexpected error occurred: ${details}`);
+    showToast(`An unexpected error occurred: ${sanitizeErrorMessage(details)}`);
   });
 }
 
