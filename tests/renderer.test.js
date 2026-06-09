@@ -81,6 +81,7 @@ function loadRendererInternals() {
     path.join(dir, 'ocr.js'),
     path.join(dir, 'review.js'),
     path.join(dir, 'overlays.js'),
+    path.join(dir, 'events.js'),
     path.join(__dirname, '..', 'renderer.js')
   ];
 
@@ -417,7 +418,7 @@ describe('Renderer UI Helpers', () => {
         this.defaultPrevented = true;
       }
     };
-    handleReviewKeyDown(eventAltDown);
+    handleReviewKeyDown(eventAltDown, () => {});
 
     assert.strictEqual(eventAltDown.defaultPrevented, true);
     assert.strictEqual(state.selectedId, 'doc-2');
@@ -434,7 +435,7 @@ describe('Renderer UI Helpers', () => {
         this.defaultPrevented = true;
       }
     };
-    handleReviewKeyDown(eventAltUp);
+    handleReviewKeyDown(eventAltUp, () => {});
 
     assert.strictEqual(eventAltUp.defaultPrevented, true);
     assert.strictEqual(state.selectedId, 'doc-1');
@@ -496,7 +497,7 @@ describe('Renderer UI Helpers', () => {
         this.defaultPrevented = true;
       }
     };
-    handleReviewKeyDown(eventCtrlEnter);
+    handleReviewKeyDown(eventCtrlEnter, () => {});
 
     assert.strictEqual(eventCtrlEnter.defaultPrevented, true);
     await new Promise((resolve) => setTimeout(resolve, 60));
@@ -535,7 +536,7 @@ describe('Renderer UI Helpers', () => {
         this.defaultPrevented = true;
       }
     };
-    handleReviewKeyDown(eventEnter);
+    handleReviewKeyDown(eventEnter, () => {});
 
     assert.strictEqual(eventEnter.defaultPrevented, true);
     assert.strictEqual(nextFocused, true);
@@ -566,7 +567,7 @@ describe('Renderer UI Helpers', () => {
         this.defaultPrevented = true;
       }
     };
-    handleReviewKeyDown(eventAltDown);
+    handleReviewKeyDown(eventAltDown, () => {});
 
     assert.notStrictEqual(eventAltDown.defaultPrevented, true);
     assert.strictEqual(state.selectedId, 'doc-1');
@@ -678,7 +679,7 @@ describe('Saved Records Pagination Controls', () => {
     const { bindEvents, state } = localSandbox.module.exports.__test__;
     state.pagination = { page: 1, limit: 10, total: 15 };
 
-    bindEvents();
+    bindEvents(() => {});
 
     localSandbox.window.api.listRecords = async (options) => {
       listRecordsCalls.push(JSON.parse(JSON.stringify(options)));
@@ -698,7 +699,7 @@ describe('Saved Records Pagination Controls', () => {
     const { bindEvents, state } = localSandbox.module.exports.__test__;
     state.pagination = { page: 2, limit: 10, total: 15 };
 
-    bindEvents();
+    bindEvents(() => {});
 
     localSandbox.window.api.listRecords = async (options) => {
       listRecordsCalls.push(JSON.parse(JSON.stringify(options)));
@@ -716,7 +717,7 @@ describe('Saved Records Pagination Controls', () => {
     const { bindEvents, state } = localSandbox.module.exports.__test__;
     state.pagination = { page: 3, limit: 10, total: 35 };
 
-    bindEvents();
+    bindEvents(() => {});
 
     localSandbox.window.api.listRecords = async (options) => {
       listRecordsCalls.push(JSON.parse(JSON.stringify(options)));
