@@ -1,6 +1,6 @@
 import { state, fields } from './state.js';
 import { createQueueItem, getExtractionNotes } from './utils.js';
-import { query, text, setStatus } from './dom.js';
+import { query, text, setStatus, createConfidenceBadge } from './dom.js';
 
 let _queueRender = () => {};
 

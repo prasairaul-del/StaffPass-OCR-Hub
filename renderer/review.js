@@ -1,7 +1,7 @@
 import { state, fields } from './state.js';
-import { query, text, setStatus } from './dom.js';
+import { query, text, setStatus, createConfidenceBadge } from './dom.js';
 import { getSelectedItem } from './queue.js';
-import { validateReviewData, createConfidenceBadge } from './utils.js';
+import { validateReviewData } from './utils.js';
 
 let _reviewRender = () => {};
 

@@ -108,3 +108,20 @@ export function focusNextField(currentField) {
   }
 }
 
+export function createConfidenceBadge(score) {
+  const badge = document.createElement('span');
+  badge.classList.add('confidence-badge');
+  const value = Number(score) || 0;
+  if (value >= 95) {
+    badge.classList.add('confidence-high');
+    badge.innerHTML = `<span class="badge-icon">✅</span> ${value}%`;
+  } else if (value >= 80) {
+    badge.classList.add('confidence-medium');
+    badge.innerHTML = `<span class="badge-icon">⚠️</span> ${value}%`;
+  } else {
+    badge.classList.add('confidence-low');
+    badge.innerHTML = `<span class="badge-icon">❌</span> ${value}%`;
+  }
+  return badge;
+}
+
