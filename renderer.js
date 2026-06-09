@@ -1,5 +1,6 @@
 import { state } from './renderer/state.js';
 import { query, setStatus, enforceOverlayFocus, focusNextField } from './renderer/dom.js';
+import { debounce } from './renderer/utils.js';
 
 import { 
   renderMetrics, 
@@ -78,8 +79,21 @@ export function bindEvents() {
   query('correct-btn')?.addEventListener('click', () => saveSelectedReview('Corrected'));
   query('save-corrections-btn')?.addEventListener('click', () => saveSelectedReview('Corrected'));
 
-  query('record-search-input')?.addEventListener('input', () => {
+  const searchInput = query('record-search-input');
+  const spinner = query('search-spinner');
+
+  const debouncedRender = debounce(() => {
     renderRecords();
+    if (spinner) {
+      spinner.classList.remove('is-searching');
+    }
+  }, 250);
+
+  searchInput?.addEventListener('input', () => {
+    if (spinner) {
+      spinner.classList.add('is-searching');
+    }
+    debouncedRender();
   });
   query('record-type-filter')?.addEventListener('change', () => {
     renderRecords();
@@ -286,6 +300,7 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
 export { 
   compareVersions, 
   createQueueItem, 
+  debounce,
   getConfidenceStatus, 
   getExtractionNotes, 
   getReviewStatusForExtraction, 

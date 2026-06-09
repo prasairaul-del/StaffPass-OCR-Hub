@@ -248,7 +248,10 @@
 
         <!-- Saved Records Filtering Controls -->
         <div class="filter-controls" style="display: flex; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; align-items: center; padding: 0 4px;">
-          <input id="record-search-input" class="correction-textarea" style="flex: 1; min-height: 36px; padding: 0 12px;" type="text" placeholder="Search by name, document number, or type...">
+          <div class="search-wrapper" style="position: relative; flex: 1; display: flex; align-items: center;">
+            <input id="record-search-input" class="correction-textarea" style="width: 100%; min-height: 36px; padding: 0 36px 0 12px; margin: 0;" type="text" placeholder="Search by name, document number, or type...">
+            <div id="search-spinner" class="search-spinner" style="position: absolute; right: 12px; width: 16px; height: 16px; border: 2px solid var(--border); border-top-color: var(--primary); border-radius: 50%; opacity: 0; pointer-events: none; transition: opacity 0.15s;"></div>
+          </div>
           <select id="record-type-filter" class="tool-button" style="min-height: 36px; padding: 0 12px; cursor: pointer; background: var(--surface);">
             <option value="">All Document Types</option>
             <option value="Staff Pass">Staff Pass</option>

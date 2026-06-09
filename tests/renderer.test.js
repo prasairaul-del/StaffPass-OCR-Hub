@@ -127,7 +127,7 @@ function loadRendererInternals() {
   sandbox.global = sandbox;
   sandbox.globalThis = sandbox;
 
-  const exposedSource = `${source}\nmodule.exports.__test__ = { bindEvents, dismissWhatsNew, enforceOverlayFocus, getExtractionNotes, getReviewStatusForExtraction, keepFocusInsideOverlay, showWhatsNewDialog, updateDocumentPreview, handleReviewKeyDown, focusNextField, state };\nmodule.exports.createQueueItem = createQueueItem;\nmodule.exports.getConfidenceStatus = getConfidenceStatus;\nmodule.exports.normalizeExtraction = normalizeExtraction;\nmodule.exports.validateReviewData = validateReviewData;`;
+  const exposedSource = `${source}\nmodule.exports.__test__ = { bindEvents, dismissWhatsNew, enforceOverlayFocus, getExtractionNotes, getReviewStatusForExtraction, keepFocusInsideOverlay, showWhatsNewDialog, updateDocumentPreview, handleReviewKeyDown, focusNextField, state };\nmodule.exports.createQueueItem = createQueueItem;\nmodule.exports.getConfidenceStatus = getConfidenceStatus;\nmodule.exports.normalizeExtraction = normalizeExtraction;\nmodule.exports.validateReviewData = validateReviewData;\nmodule.exports.debounce = debounce;`;
   
   vm.runInNewContext(exposedSource, sandbox, { filename: path.join(__dirname, '..', 'renderer.js') });
   
@@ -135,6 +135,7 @@ function loadRendererInternals() {
   sandbox.getConfidenceStatus = sandbox.module.exports.getConfidenceStatus;
   sandbox.normalizeExtraction = (...args) => JSON.parse(JSON.stringify(sandbox.module.exports.normalizeExtraction(...args)));
   sandbox.validateReviewData = (...args) => JSON.parse(JSON.stringify(sandbox.module.exports.validateReviewData(...args)));
+  sandbox.debounce = sandbox.module.exports.debounce;
 
   return sandbox;
 }
@@ -142,6 +143,7 @@ function loadRendererInternals() {
 const sandbox = loadRendererInternals();
 const {
   createQueueItem,
+  debounce,
   getConfidenceStatus,
   normalizeExtraction,
   validateReviewData
@@ -562,5 +564,42 @@ describe('Renderer UI Helpers', () => {
 
     assert.notStrictEqual(eventAltDown.defaultPrevented, true);
     assert.strictEqual(state.selectedId, 'doc-1');
+  });
+
+  describe('debounce utility', () => {
+    it('should execute after the wait time', async () => {
+      let called = 0;
+      let argPassed = null;
+      const fn = debounce((val) => {
+        called++;
+        argPassed = val;
+      }, 50);
+
+      fn('test-value');
+      assert.strictEqual(called, 0);
+
+      await new Promise(resolve => setTimeout(resolve, 80));
+      assert.strictEqual(called, 1);
+      assert.strictEqual(argPassed, 'test-value');
+    });
+
+    it('should throttle multiple quick successive calls and trigger only once', async () => {
+      let called = 0;
+      let argPassed = null;
+      const fn = debounce((val) => {
+        called++;
+        argPassed = val;
+      }, 50);
+
+      fn('first');
+      fn('second');
+      fn('third');
+
+      assert.strictEqual(called, 0);
+
+      await new Promise(resolve => setTimeout(resolve, 80));
+      assert.strictEqual(called, 1);
+      assert.strictEqual(argPassed, 'third');
+    });
   });
 });
