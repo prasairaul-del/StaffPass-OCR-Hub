@@ -1422,3 +1422,33 @@ kbd {
   box-shadow: 0 0 10px hsla(250, 89%, 60%, 0.45);
 }
 
+/* Confidence Badges styling */
+.confidence-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.confidence-high {
+  background: var(--success-soft);
+  color: var(--success-color);
+  border: 1px solid var(--success);
+}
+
+.confidence-medium {
+  background: var(--warning-soft, rgba(245, 158, 11, 0.15));
+  color: var(--warning);
+  border: 1px solid var(--warning);
+}
+
+.confidence-low {
+  background: var(--danger-soft);
+  color: var(--danger-color);
+  border: 1px solid var(--danger);
+}
+
