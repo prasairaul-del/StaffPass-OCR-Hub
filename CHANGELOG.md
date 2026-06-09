@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Database-level pagination (LIMIT/OFFSET) for the Saved Records panel to eliminate rendering latency.
+- Search input debouncing with a visual spinner loader feedback in Saved Records.
+- Keyboard-only manual review workflow supporting queue navigation (Alt+Up/Down) and rapid field traversal (Enter key).
 - Bundled offline Google ML Kit Text Recognition for native Android OCR in the standalone mobile app shell (no Play Store or network dependency).
 - Decoupled OCR parsing logic into `ocr-parser.ts` to allow 100% test coverage with Node.js built-in test runner (`node:test`) and tsx compiling, with `8/8` passing test cases.
 - Configured EAS project linking and updated `package.json` to exclude react-native architecture validation warnings in `expo-doctor`.
