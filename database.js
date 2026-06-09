@@ -16,6 +16,16 @@ let db;
 let dbPath = DEFAULT_DB_PATH;
 let dbExistedBeforeOpen = false;
 
+let stmtInsertStaff;
+let stmtUpdateStaff;
+let stmtInsertDocument;
+let stmtInsertAuditLog;
+let stmtLogAudit;
+let stmtGetSchemaVersion;
+let stmtInsertSchemaVersion;
+let stmtTableExists;
+
+
 function sqlStringLiteral(value) {
   return `'${String(value).replace(/'/g, "''")}'`;
 }
@@ -52,6 +62,10 @@ function isInMemoryDatabasePath(value) {
 }
 
 function tableExists(database, tableName) {
+  if (stmtTableExists) {
+    var row = stmtTableExists.get(tableName);
+    return !!row;
+  }
   var row = database.prepare(
     "SELECT 1 AS found FROM sqlite_master WHERE type = 'table' AND name = ?"
   ).get(tableName);
@@ -71,6 +85,10 @@ function ensureSchemaMigrationsTable(database) {
 function getAppliedSchemaVersion(database) {
   if (!tableExists(database, 'schema_migrations')) return 0;
 
+  if (stmtGetSchemaVersion) {
+    var row = stmtGetSchemaVersion.get();
+    return row && row.version ? Number(row.version) : 0;
+  }
   var row = database.prepare('SELECT MAX(version) AS version FROM schema_migrations').get();
   return row && row.version ? Number(row.version) : 0;
 }
@@ -224,6 +242,10 @@ function rebuildTablesWithChecks(database) {
 }
 
 function recordMigrationVersion(database, version) {
+  if (stmtInsertSchemaVersion) {
+    stmtInsertSchemaVersion.run(version);
+    return;
+  }
   database.prepare(
     'INSERT INTO schema_migrations (version) VALUES (?)'
   ).run(version);
@@ -268,6 +290,50 @@ function applyPendingMigrations(database) {
   }
 }
 
+function prepareStatements(database) {
+  stmtInsertStaff = database.prepare([
+    'INSERT INTO staff (',
+    '  first_name,',
+    '  last_name,',
+    '  phone_number,',
+    '  overall_status,',
+    '  created_at,',
+    '  updated_at',
+    ') VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)'
+  ].join('\n'));
+
+  stmtUpdateStaff = database.prepare([
+    'UPDATE staff',
+    'SET overall_status = ?, updated_at = CURRENT_TIMESTAMP',
+    'WHERE id = ?'
+  ].join('\n'));
+
+  stmtInsertDocument = database.prepare([
+    'INSERT INTO documents (',
+    '  staff_id,',
+    '  doc_type,',
+    '  doc_number,',
+    '  expiry_date,',
+    '  confidence_score,',
+    '  file_path,',
+    '  notes,',
+    '  review_status',
+    ') VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+  ].join('\n'));
+
+  stmtInsertAuditLog = database.prepare([
+    'INSERT INTO audit_logs (event_type, details)',
+    'VALUES (?, ?)'
+  ].join('\n'));
+
+  stmtLogAudit = database.prepare(
+    'INSERT INTO audit_logs (event_type, details) VALUES (?, ?)'
+  );
+
+  stmtGetSchemaVersion = database.prepare('SELECT MAX(version) AS version FROM schema_migrations');
+  stmtInsertSchemaVersion = database.prepare('INSERT INTO schema_migrations (version) VALUES (?)');
+}
+
 function init(nextDbPath) {
   close();
   dbPath = nextDbPath || DEFAULT_DB_PATH;
@@ -275,7 +341,11 @@ function init(nextDbPath) {
   db = new Database(dbPath);
   registerDatabaseFunctions(db);
   db.pragma('foreign_keys = ON');
+
+  stmtTableExists = db.prepare("SELECT 1 AS found FROM sqlite_master WHERE type = 'table' AND name = ?");
+
   applyPendingMigrations(db);
+  prepareStatements(db);
 }
 
 function ensureDb() {
@@ -295,6 +365,14 @@ function close() {
   if (!db) return;
   db.close();
   db = null;
+  stmtInsertStaff = null;
+  stmtUpdateStaff = null;
+  stmtInsertDocument = null;
+  stmtInsertAuditLog = null;
+  stmtLogAudit = null;
+  stmtGetSchemaVersion = null;
+  stmtInsertSchemaVersion = null;
+  stmtTableExists = null;
 }
 
 function serializeDetails(details) {
@@ -305,9 +383,7 @@ function serializeDetails(details) {
 
 function logAudit(eventType, details) {
   var database = ensureDb();
-  var result = database.prepare(
-    'INSERT INTO audit_logs (event_type, details) VALUES (?, ?)'
-  ).run(eventType, serializeDetails(details));
+  var result = stmtLogAudit.run(eventType, serializeDetails(details));
 
   return result.lastInsertRowid;
 }
@@ -358,16 +434,7 @@ function saveReviewedDocument(payload) {
     var staffId = input.staff_id ? Number(input.staff_id) : null;
 
     if (!staffId) {
-      var staffResult = database.prepare([
-        'INSERT INTO staff (',
-        '  first_name,',
-        '  last_name,',
-        '  phone_number,',
-        '  overall_status,',
-        '  created_at,',
-        '  updated_at',
-        ') VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)'
-      ].join('\n')).run(
+      var staffResult = stmtInsertStaff.run(
         normalizeText(input.first_name),
         normalizeText(input.last_name),
         normalizeText(input.phone_number),
@@ -375,25 +442,10 @@ function saveReviewedDocument(payload) {
       );
       staffId = Number(staffResult.lastInsertRowid);
     } else {
-      database.prepare([
-        'UPDATE staff',
-        'SET overall_status = ?, updated_at = CURRENT_TIMESTAMP',
-        'WHERE id = ?'
-      ].join('\n')).run(overallStatus, staffId);
+      stmtUpdateStaff.run(overallStatus, staffId);
     }
 
-    var documentResult = database.prepare([
-      'INSERT INTO documents (',
-      '  staff_id,',
-      '  doc_type,',
-      '  doc_number,',
-      '  expiry_date,',
-      '  confidence_score,',
-      '  file_path,',
-      '  notes,',
-      '  review_status',
-      ') VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-    ].join('\n')).run(
+    var documentResult = stmtInsertDocument.run(
       staffId,
       normalizeText(input.doc_type),
       normalizeText(input.doc_number),
@@ -405,10 +457,7 @@ function saveReviewedDocument(payload) {
     );
 
     var documentId = Number(documentResult.lastInsertRowid);
-    var auditId = database.prepare([
-      'INSERT INTO audit_logs (event_type, details)',
-      'VALUES (?, ?)'
-    ].join('\n')).run(
+    var auditId = stmtInsertAuditLog.run(
       'review.saved',
       JSON.stringify({
         staff_id: staffId,
