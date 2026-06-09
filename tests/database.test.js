@@ -384,4 +384,25 @@ describe('Database persistence helpers', () => {
     assert.strictEqual(page2.length, 1);
     assert.strictEqual(page2[0].first_name, 'John');
   });
+
+  it('rolls back the transaction and saves nothing if a database-level constraint fails', () => {
+    // A non-existent staff_id will pass JS validation but fail SQLite foreign key check
+    assert.throws(
+      () => db.saveReviewedDocument({
+        staff_id: 999999,
+        first_name: 'John',
+        last_name: 'Doe',
+        doc_type: 'PASSPORT',
+        doc_number: 'P1234567',
+        file_path: 'sample/passport.jpg',
+        confidence_score: 95,
+        review_status: 'Approved'
+      }),
+      /foreign key/i
+    );
+
+    // Verify database remains empty/unaffected
+    const records = db.listRecords();
+    assert.strictEqual(records.length, 0);
+  });
 });
