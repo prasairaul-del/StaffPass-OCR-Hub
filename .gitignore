@@ -32,3 +32,4 @@ mobile/credentials.json
 *.tiff
 *.webp
 .agent-state.json
+.memory/
