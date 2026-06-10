@@ -5,6 +5,8 @@
 Version: 1.0
 Status: Historical blueprint; current release-readiness baseline is Electron `40.9.3` with local-first runtime processing, real PDF preview, CSV export, DB validation/migrations, and cert-gated production release scripts.
 
+Current implementation note, reconciled 2026-06-10: this file remains a long-term roadmap, not the active task plan. Use `implementation_plan.md` for current work status. Several roadmap items are now implemented, including SQLite migrations/constraints, review transactions, audit logs, PDF preview through the sidecar loop, batch queueing, renderer modularization, Expo mobile local storage, offline mobile OCR parsing, and release validation scripts. Still-future areas include full staff deduplication, archive/quarantine workflows, broader image preprocessing, and manual live UI smoke verification before release.
+
 ---
 
 # Executive Summary

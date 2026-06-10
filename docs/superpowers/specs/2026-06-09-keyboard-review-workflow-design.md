@@ -7,6 +7,17 @@ This specification details the design for a Keyboard-Only Review Workflow in the
 
 ---
 
+## Current Verification
+
+Rechecked on 2026-06-10:
+
+- `renderer/events.js` handles Review-tab keyboard shortcuts.
+- `renderer/dom.js` provides field focus traversal.
+- `tests/renderer.test.js` covers Alt+Up/Down, Ctrl+Enter, Enter field traversal, and modal-overlay bypass behavior.
+- `rtk npm test` passed.
+
+---
+
 ## 1. Interaction Model & Keyboard Mappings
 
 When the Review tab is active (`state.activeView === 'review'`) and no modal overlay is visible, the following keyboard mappings are active:

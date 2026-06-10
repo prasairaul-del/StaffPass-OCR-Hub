@@ -7,7 +7,19 @@ Standalone Android implementation for StaffPass OCR Hub. It is a mobile-native E
 - Local-first Android app shell is implemented under `mobile/`.
 - Capture/import, review, local SQLite records, search, and CSV export are implemented.
 - Native offline OCR is fully implemented using Google ML Kit Text Recognition with regex-based field parsing for Emirates IDs and Passports.
+- Strict TypeScript is enabled in `tsconfig.json`.
 - APK builds are for direct install/internal testing. Play Store release should use the AAB profile.
+
+## Verification Baseline
+
+Last checked on 2026-06-10:
+
+```bash
+npm run test
+npm run typecheck
+```
+
+Both commands passed from the `mobile/` directory via root-prefixed commands.
 
 ## Commands
 

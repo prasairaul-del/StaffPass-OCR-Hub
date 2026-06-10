@@ -6,6 +6,20 @@
 
 ---
 
+## Verification Status
+
+Rechecked on 2026-06-10:
+
+| Command | Result |
+|---|---|
+| `rtk npm test` | Passed |
+| `rtk npm --prefix mobile test` | Passed |
+| `rtk npm --prefix mobile run typecheck` | Passed |
+
+This file is historical implementation evidence. New planning should use `implementation_plan.md` as the current status source.
+
+---
+
 ## Fix 1 — `compareVersions` undefined (🔴 Critical)
 - **File**: `renderer.js`
 - **Action**: Add `compareVersions(a, b)` function. Splits on `.`, compares numeric segments L→R. Returns `1` (a>b), `-1` (a<b), `0` (equal).

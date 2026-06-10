@@ -1,9 +1,36 @@
 # Specification: App Improvements (Codebase, UI/UX, Sidecar, Mobile)
 
 **Date**: 2026-06-09
-**Status**: Approved
+**Status**: Implemented and verified
 
 This specification details the design for implementing various codebase, UI/UX, sidecar, and mobile app improvements across the StaffPass OCR Hub project.
+
+---
+
+## 0. Implementation Status
+
+Verified on 2026-06-10:
+
+| Area | Status | Evidence |
+|---|---|---|
+| SQLite transactions | Implemented | `database.js` wraps review saves in a transaction; rollback tested in `tests/database.test.js`. |
+| Renderer error handling | Implemented | `renderer.js` handles `error` and `unhandledrejection`; sanitization tested in `tests/renderer.test.js`. |
+| Mobile strict TypeScript | Implemented | `mobile/tsconfig.json` has `strict: true`; `npm --prefix mobile run typecheck` passes. |
+| Drag-and-drop overlay | Implemented | `renderer/events.js` handles window drag lifecycle and cleanup; tested in `tests/renderer.test.js`. |
+| Confidence badges | Implemented | `createConfidenceBadge` lives in `renderer/dom.js` and is reused by queue/review renderers. |
+| Sidecar auto-restart | Implemented | `sidecar_bridge.js` retries active requests after premature child exit; tested in `tests/sidecar_bridge.test.js`. |
+| IPC/sidecar payload validation | Implemented | `sidecar_bridge.js` and `sidecar/ocr_sidecar.py` validate action payloads. |
+| Mobile lint config | Implemented | `mobile/package.json` includes an Expo ESLint config and lint script. |
+
+Current verification baseline:
+
+```bash
+rtk npm test
+rtk npm --prefix mobile test
+rtk npm --prefix mobile run typecheck
+```
+
+All three commands passed on 2026-06-10.
 
 ---
 

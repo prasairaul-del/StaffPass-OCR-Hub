@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Renderer-level unhandled error and unhandled promise rejection handling with sanitized toast messages.
+- Window-level drag-and-drop overlay cleanup for drag leave, drop, blur, drag end, and event-listener teardown.
+- JavaScript-side OCR sidecar payload validation before stdin writes, with matching Python-side action validation.
+- OCR sidecar auto-restart and retry handling for premature child-process exits during active requests.
+- Strict TypeScript compiler mode for the mobile Expo app.
 - Database-level pagination (LIMIT/OFFSET) for the Saved Records panel to eliminate rendering latency.
 - Search input debouncing with a visual spinner loader feedback in Saved Records.
 - Keyboard-only manual review workflow supporting queue navigation (Alt+Up/Down) and rapid field traversal (Enter key).
@@ -29,6 +34,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Documented the three release states: unsigned smoke build, cert-ready guarded build, and production release with fresh updater metadata.
 
 ### Fixed
+- Review saves now run inside a single SQLite transaction and roll back cleanly on constraint failures.
+- Confidence badges are centralized through `renderer/dom.js` and reused in queue and saved-record render paths.
 - Resolved `compareVersions` undefined crash in the updater/release flow.
 - Unified response envelope shape of `MockAdapter` to match `GLMOCRAdapter`.
 - Split monolithic 1,307-line `renderer.js` into modular ES Modules under `renderer/` to improve code organization.

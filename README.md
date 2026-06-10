@@ -24,6 +24,7 @@
 - [Project Structure](#project-structure)
 - [Development](#development)
 - [Testing](#testing)
+- [Verification Baseline](#verification-baseline)
 - [Building](#building)
 - [Auto-Updates](#auto-updates)
 - [Database Schema](#database-schema)
@@ -345,6 +346,27 @@ npm run mobile:doctor
 npm run mobile:typecheck
 npm run mobile:test
 ```
+
+---
+
+## Verification Baseline
+
+Last checked on 2026-06-10:
+
+| Command | Result |
+|---------|--------|
+| `rtk npm test` | Passed |
+| `rtk npm --prefix mobile test` | Passed |
+| `rtk npm --prefix mobile run typecheck` | Passed |
+
+Current implementation status:
+
+- Review saves are transactional and covered by rollback tests.
+- Renderer catches unhandled errors/rejections and sanitizes user-facing toast details.
+- Sidecar payloads are validated in JavaScript and Python.
+- OCR sidecar auto-restart is covered by tests.
+- Mobile TypeScript strict mode is enabled.
+- Historical specs under `docs/superpowers/specs/` are implemented records, not pending task lists.
 
 ---
 

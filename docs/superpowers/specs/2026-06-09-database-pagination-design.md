@@ -7,6 +7,17 @@ This specification details the design for introducing database-level server-side
 
 ---
 
+## Current Verification
+
+Rechecked on 2026-06-10:
+
+- `database.js` supports `listRecords(options)` and `countRecords(options)`.
+- `preload.js` exposes `listRecords(options)` and `countRecords(options)`.
+- Renderer pagination state, page-size changes, search reset, and type-filter reset are covered in `tests/renderer.test.js`.
+- `rtk npm test` passed.
+
+---
+
 ## 1. UI Layout & CSS (Section 1)
 
 We will append a pagination controls container to the `records-panel` in `index.html`, positioned immediately after the `.table-frame`.

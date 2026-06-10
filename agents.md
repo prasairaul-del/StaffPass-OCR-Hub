@@ -2,6 +2,14 @@
 
 This document defines the agent roles and collaboration workflow for the StaffPass Local OCR Hub.
 
+## Current Documentation Status
+
+Last reconciled: 2026-06-10.
+
+- `implementation_plan.md` is the current planning source of truth.
+- `docs/superpowers/specs/*.md` are retained as historical design and verification specs.
+- New implementation tasks should start from the current code state and verification baseline, not from stale pending rows in older specs.
+
 ## Agent Directory
 
 ### 1. Orchestrator (Antigravity)

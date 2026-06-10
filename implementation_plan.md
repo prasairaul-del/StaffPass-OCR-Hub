@@ -1,45 +1,68 @@
 # Implementation Plan: App Improvements (Subagent Driven)
 
-This implementation plan details the tasks required to add modular codebase, UI/UX, sidecar, and mobile app improvements. Each task is executed by an Implementer subagent and verified by Spec and Quality Reviewer subagents.
+Status: Reconciled with current code on 2026-06-10.
+
+This plan tracks the app-improvement wave originally designed in `docs/superpowers/specs/2026-06-09-app-improvements-design.md`. The implementation has landed; this file now records verified status and remaining planning targets before any new engineering work.
 
 ---
 
-## 1. Task Checklist
+## 1. Completed Task Checklist
 
-| Priority | Task Description | Target File | Status | Notes |
+| Priority | Task Description | Target File(s) | Status | Verification |
 | :--- | :--- | :--- | :--- | :--- |
-| 🔴 **Critical** | Implement SQLite transactions for reviews | `database.js` | ⏳ Pending | Wrap updates inside transactions. |
-| 🔴 **Critical** | Add UI error boundaries | `renderer.js` | ⏳ Pending | Catch unhandled promises. |
-| 🔴 **Critical** | Enable strict TypeScript | `mobile/tsconfig.json` | ⏳ Pending | Set `strict: true`. |
-| 🟠 **High** | Create drag-and-drop overlay | `index.html` / `renderer/events.js` | ⏳ Pending | Listen to drag states. |
-| 🟠 **High** | Update confidence badges | `renderer/review.js` | ⏳ Pending | Add check/warn/cross styles. |
-| 🟠 **High** | Refine Slate HSL styling | `index.css` | ⏳ Pending | Glows and active row borders. |
-| 🟠 **High** | Implement sidecar auto-restart | `sidecar_bridge.js` | ⏳ Pending | Recover dead python process. |
-| 🟠 **High** | Add IPC schema validation | `sidecar_bridge.js` & `sidecar/ocr_sidecar.py` | ⏳ Pending | Validate JSON action formats. |
-| 🟢 **Low** | Mobile linter config | `mobile/package.json` | ⏳ Pending | Set ESLint environment. |
+| Critical | Implement SQLite transactions for reviews | `database.js` | Complete | `tests/database.test.js` rollback coverage |
+| Critical | Add renderer error handling | `renderer.js` | Complete | `tests/renderer.test.js` unhandled error/rejection coverage |
+| Critical | Enable strict TypeScript | `mobile/tsconfig.json` | Complete | `npm --prefix mobile run typecheck` |
+| High | Create drag-and-drop overlay | `index.html`, `renderer/events.js` | Complete | `tests/renderer.test.js` drag/drop coverage |
+| High | Update confidence badges | `renderer/dom.js`, `renderer/review.js`, `renderer/queue.js` | Complete | `tests/renderer.test.js` badge coverage |
+| High | Refine Slate HSL styling | `index.css` | Complete | Desktop UI styles present; automated visual check not run in this pass |
+| High | Implement sidecar auto-restart | `sidecar_bridge.js` | Complete | `tests/sidecar_bridge.test.js` auto-restart coverage |
+| High | Add sidecar payload validation | `sidecar_bridge.js`, `sidecar/ocr_sidecar.py` | Complete | JS-side validation test plus Python entry validation present |
+| Low | Mobile linter config | `mobile/package.json` | Complete | `npm --prefix mobile run typecheck`; lint script configured |
 
 ---
 
-## 2. Technical Steps
+## 2. Verification Baseline
 
-### Step 1: Database helpers & Error boundaries
-- Wrap database edits in transactions.
-- Catch unhandled rejections in renderer.
-- Configure TypeScript compiler strictness.
+Last verified on 2026-06-10:
 
-### Step 2: UI/UX redesign elements
-- Insert overlay div in HTML and control display in events.js.
-- Create helper mapping confidence scores to formatted HTML badges.
-- Style row outlines, glows, and theme colors.
-
-### Step 3: Sidecar and Mobile settings
-- Re-spawn child in bridge stderr/exit handler.
-- Verify schema in Node child process interface and Python main loop.
-- Install ESLint configuration.
+| Command | Result |
+| :--- | :--- |
+| `rtk npm test` | Passed |
+| `rtk npm --prefix mobile test` | Passed |
+| `rtk npm --prefix mobile run typecheck` | Passed |
 
 ---
 
-## 3. Verification Plan
+## 3. Current Architecture Notes
 
-1. **Unit Tests**: Propose and run mocha tests validating transactions and auto-restart behavior.
-2. **Manual check**: Verify overlay display on drag-and-drop and confirm sidecar re-spawns successfully on mock crash.
+- Desktop runtime is Electron with context isolation, sandboxing, named IPC, and local SQLite persistence.
+- OCR runs through `sidecar_bridge.js` and `sidecar/ocr_sidecar.py` using stdin/stdout JSON.
+- Mobile runtime is a standalone Expo Android app using `expo-sqlite` and offline ML Kit text recognition.
+- Release flow is split into unsigned smoke builds, unsigned local installer builds, and cert-gated production release builds.
+
+---
+
+## 4. Remaining Planning Targets
+
+| Priority | Target | Reason |
+| :--- | :--- | :--- |
+| High | Release-readiness sweep | Validate installer metadata, updater metadata, signing gates, and current dist artifacts before publishing. |
+| High | Manual UI smoke pass | Automated renderer tests cover behavior, but drag overlay and visual polish still need a live Electron smoke check. |
+| Medium | Documentation encoding cleanup | Several historical Markdown files contain mojibake from earlier Unicode box/icon characters. |
+| Medium | Staff deduplication plan | Blueprint still calls out duplicate matching as a future product capability. |
+| Medium | Archive/quarantine workflow plan | Blueprint describes archival modes that are not yet fully implemented as production workflow. |
+
+---
+
+## 5. Next Planning Rule
+
+Before adding new features, run:
+
+```bash
+rtk npm test
+rtk npm --prefix mobile test
+rtk npm --prefix mobile run typecheck
+```
+
+Then choose one explicit target: release readiness, UI smoke, deduplication, archive workflow, or docs polish.

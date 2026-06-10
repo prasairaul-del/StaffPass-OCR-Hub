@@ -7,6 +7,17 @@ This specification details the design for introducing a search input debouncer a
 
 ---
 
+## Current Verification
+
+Rechecked on 2026-06-10:
+
+- `renderer/utils.js` exports `debounce`.
+- `renderer/events.js` applies a 250ms debounced search and toggles `#search-spinner`.
+- `tests/renderer.test.js` covers debounce timing and search page reset behavior.
+- `rtk npm test` passed.
+
+---
+
 ## 1. Interaction & UI Design
 
 ### HTML Structure (`index.html`)
