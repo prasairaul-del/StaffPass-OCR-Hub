@@ -13,6 +13,7 @@
     "prepare": "husky",
     "rebuild": "electron-builder install-app-deps",
     "check-signing": "node scripts/check-signing.js",
+    "sync:release-artifacts": "node scripts/sync-release-artifacts.js",
     "validate:release-config": "node scripts/validate-release.js --mode config",
     "validate:release": "node scripts/validate-release.js --mode release",
     "validate:smoke": "node scripts/validate-release.js --mode smoke",
@@ -22,8 +23,8 @@
     "mobile:android:apk": "npm --prefix mobile run build:android:apk",
     "mobile:android:aab": "npm --prefix mobile run build:android:aab",
     "dist:smoke": "npm run rebuild && electron-builder --win --dir",
-    "dist:installer:unsigned": "npm run rebuild && electron-builder --win --publish never -c.win.signAndEditExecutable=false",
-    "dist:release": "npm run check-signing && npm run rebuild && electron-builder --win",
+    "dist:installer:unsigned": "npm run rebuild && electron-builder --win --publish never -c.win.signAndEditExecutable=false && npm run sync:release-artifacts",
+    "dist:release": "npm run check-signing && npm run rebuild && electron-builder --win && npm run sync:release-artifacts",
     "dist": "npm run dist:release",
     "dist:dir": "npm run dist:smoke"
   },

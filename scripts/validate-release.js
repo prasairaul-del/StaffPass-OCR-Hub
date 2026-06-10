@@ -35,7 +35,8 @@ function emitResult(label, result) {
     return;
   }
 
-  for (const issue of result.issues || []) {
+  const issues = result.issues && result.issues.length ? result.issues : [result.message || 'validation failed'];
+  for (const issue of issues) {
     console.error(`${label}: ${issue}`);
   }
   process.exitCode = 1;

@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 
 const SIGNING_ENV_KEYS = [
   'CSC_LINK',
@@ -70,7 +71,18 @@ function getProductName(pkg = loadPackageJson()) {
 }
 
 function getExpectedInstallerName(pkg = loadPackageJson()) {
+  const publishConfig = pkg.build && pkg.build.publish;
+  const publishTarget = Array.isArray(publishConfig) ? publishConfig[0] : publishConfig;
+  const releaseAssetBaseName = publishTarget && publishTarget.repo ? publishTarget.repo : pkg.name;
+  return `${releaseAssetBaseName}-Setup-${pkg.version}.exe`;
+}
+
+function getLocalInstallerName(pkg = loadPackageJson()) {
   return `${getProductName(pkg)} Setup ${pkg.version}.exe`;
+}
+
+function getFileSha512Base64(filePath) {
+  return crypto.createHash('sha512').update(fs.readFileSync(filePath)).digest('base64');
 }
 
 function stripQuotes(value) {
@@ -246,6 +258,26 @@ function validateReleaseArtifacts({ distDir = path.join(process.cwd(), 'dist_ins
     const stats = fs.statSync(installerPath);
     if (!stats.isFile() || stats.size <= 0) {
       issues.push(`Installer referenced by latest.yml is empty or not a file: ${installerPath}.`);
+    } else {
+      if (latest.sha512 && getFileSha512Base64(installerPath) !== latest.sha512) {
+        issues.push('latest.yml top-level sha512 checksum does not match the referenced installer file.');
+      }
+
+      if (latest.files.length) {
+        const firstFile = latest.files[0];
+        if (firstFile.sha512 && firstFile.sha512 !== latest.sha512) {
+          issues.push('latest.yml file entry sha512 checksum does not match the top-level sha512 checksum.');
+        }
+
+        if (typeof firstFile.size === 'number' && firstFile.size !== stats.size) {
+          issues.push(`latest.yml file entry size ${firstFile.size} does not match installer size ${stats.size}.`);
+        }
+      }
+
+      const blockmapPath = `${installerPath}.blockmap`;
+      if (!fs.existsSync(blockmapPath)) {
+        issues.push(`Installer blockmap referenced by convention was not found: ${blockmapPath}.`);
+      }
     }
   }
 
@@ -286,7 +318,9 @@ module.exports = {
   resolveBuildMode,
   validateReleaseArtifacts,
   validateReleaseConfig,
+  getFileSha512Base64,
   getExpectedInstallerName,
+  getLocalInstallerName,
   getProductName,
   validateSmokeArtifacts
 };

@@ -6,10 +6,13 @@ const path = require('path');
 const {
   getExpectedInstallerName,
   evaluateSigningReadiness,
+  getFileSha512Base64,
+  getLocalInstallerName,
   validateReleaseArtifacts,
   validateReleaseConfig,
   validateSmokeArtifacts
 } = require('../scripts/release-utils');
+const { syncReleaseArtifacts } = require('../scripts/sync-release-artifacts');
 
 describe('Release packaging helpers', () => {
   it('distinguishes unsigned smoke builds from cert-required release builds', () => {
@@ -29,6 +32,23 @@ describe('Release packaging helpers', () => {
     assert.strictEqual(signed.ok, true);
     assert.strictEqual(signed.required, true);
     assert.strictEqual(signed.signingMaterialPresent, true);
+  });
+
+  it('resolves the installer name used by updater metadata', () => {
+    const installerName = getExpectedInstallerName({
+      version: '2.0.0',
+      name: 'example-app',
+      build: {
+        productName: 'Example App',
+        publish: {
+          provider: 'github',
+          owner: 'example',
+          repo: 'Example-App'
+        }
+      }
+    });
+
+    assert.strictEqual(installerName, 'Example-App-Setup-2.0.0.exe');
   });
 
   it('validates the draft GitHub release config without requiring secrets', () => {
@@ -60,7 +80,7 @@ describe('Release packaging helpers', () => {
     assert.match(result.issues.join('\n'), /draft/i);
   });
 
-  it('accepts smoke build output and release metadata when they stay in sync', () => {
+  it('flags release metadata when the installer checksum is out of sync', () => {
     const pkg = require('../package.json');
     const installerName = getExpectedInstallerName(pkg);
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'staffpass-release-'));
@@ -69,25 +89,62 @@ describe('Release packaging helpers', () => {
     fs.mkdirSync(unpackedDir, { recursive: true });
 
     const installerPath = path.join(distDir, installerName);
+    const payload = 'fake installer payload';
+    const checksum = Buffer.from('fake checksum').toString('base64');
     const latestYml = [
       `version: ${pkg.version}`,
       'files:',
       `  - url: ${installerName}`,
-      '    sha512: QnJva2VuU2hhNTAxQ2hlY2tzdW0=',
-      '    size: 12345',
+      `    sha512: ${checksum}`,
+      `    size: ${Buffer.byteLength(payload)}`,
       `path: ${installerName}`,
-      'sha512: QnJva2VuU2hhNTAxQ2hlY2tzdW0=',
+      `sha512: ${checksum}`,
       "releaseDate: '2026-06-07T00:00:00.000Z'",
       ''
     ].join('\n');
 
     try {
-      fs.writeFileSync(installerPath, 'fake installer payload');
+      fs.writeFileSync(installerPath, payload);
       fs.writeFileSync(path.join(distDir, 'latest.yml'), latestYml);
 
       const smokeResult = validateSmokeArtifacts({ distDir });
       assert.strictEqual(smokeResult.ok, true);
       assert.strictEqual(smokeResult.unpackedPath, unpackedDir);
+
+      const artifactResult = validateReleaseArtifacts({ distDir, pkg });
+      assert.strictEqual(artifactResult.ok, false);
+      assert.match(artifactResult.issues.join('\n'), /sha512 checksum does not match/i);
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('accepts release metadata when installer path, size, and checksum stay in sync', () => {
+    const pkg = require('../package.json');
+    const installerName = getExpectedInstallerName(pkg);
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'staffpass-release-valid-'));
+    const distDir = path.join(tempDir, 'dist_installer');
+    fs.mkdirSync(distDir, { recursive: true });
+
+    const installerPath = path.join(distDir, installerName);
+    const payload = 'fake installer payload';
+    fs.writeFileSync(installerPath, payload);
+    fs.writeFileSync(`${installerPath}.blockmap`, 'fake blockmap payload');
+    const checksum = getFileSha512Base64(installerPath);
+    const latestYml = [
+      `version: ${pkg.version}`,
+      'files:',
+      `  - url: ${installerName}`,
+      `    sha512: ${checksum}`,
+      `    size: ${Buffer.byteLength(payload)}`,
+      `path: ${installerName}`,
+      `sha512: ${checksum}`,
+      "releaseDate: '2026-06-07T00:00:00.000Z'",
+      ''
+    ].join('\n');
+
+    try {
+      fs.writeFileSync(path.join(distDir, 'latest.yml'), latestYml);
 
       const artifactResult = validateReleaseArtifacts({ distDir, pkg });
       assert.strictEqual(artifactResult.ok, true);
@@ -96,6 +153,46 @@ describe('Release packaging helpers', () => {
       assert.strictEqual(artifactResult.latest.files[0].url, installerName);
       assert.strictEqual(path.basename(artifactResult.installerPath), installerName);
       assert.strictEqual(artifactResult.expectedInstallerName, installerName);
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('copies the built installer and blockmap to the updater asset name', () => {
+    const pkg = require('../package.json');
+    const localInstallerName = getLocalInstallerName(pkg);
+    const updaterInstallerName = getExpectedInstallerName(pkg);
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'staffpass-release-sync-'));
+    const distDir = path.join(tempDir, 'dist_installer');
+    fs.mkdirSync(distDir, { recursive: true });
+
+    const localInstallerPath = path.join(distDir, localInstallerName);
+    const payload = 'fake installer payload';
+    fs.writeFileSync(localInstallerPath, payload);
+    fs.writeFileSync(`${localInstallerPath}.blockmap`, 'fake blockmap payload');
+    const checksum = getFileSha512Base64(localInstallerPath);
+    const latestYml = [
+      `version: ${pkg.version}`,
+      'files:',
+      `  - url: ${updaterInstallerName}`,
+      `    sha512: ${checksum}`,
+      `    size: ${Buffer.byteLength(payload)}`,
+      `path: ${updaterInstallerName}`,
+      `sha512: ${checksum}`,
+      "releaseDate: '2026-06-07T00:00:00.000Z'",
+      ''
+    ].join('\n');
+
+    try {
+      fs.writeFileSync(path.join(distDir, 'latest.yml'), latestYml);
+
+      const result = syncReleaseArtifacts({ distDir, pkg });
+      assert.strictEqual(result.copied, true);
+      assert.strictEqual(fs.existsSync(path.join(distDir, updaterInstallerName)), true);
+      assert.strictEqual(fs.existsSync(path.join(distDir, `${updaterInstallerName}.blockmap`)), true);
+
+      const artifactResult = validateReleaseArtifacts({ distDir, pkg });
+      assert.strictEqual(artifactResult.ok, true);
     } finally {
       fs.rmSync(tempDir, { recursive: true, force: true });
     }

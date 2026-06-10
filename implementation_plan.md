@@ -31,6 +31,9 @@ Last verified on 2026-06-10:
 | `rtk npm test` | Passed |
 | `rtk npm --prefix mobile test` | Passed |
 | `rtk npm --prefix mobile run typecheck` | Passed |
+| `rtk npm run validate:release-config` | Passed |
+| `rtk npm run validate:smoke` | Passed |
+| `rtk npm run validate:release` | Expected signing-gate failure only; release config and artifacts passed |
 
 ---
 
@@ -40,6 +43,8 @@ Last verified on 2026-06-10:
 - OCR runs through `sidecar_bridge.js` and `sidecar/ocr_sidecar.py` using stdin/stdout JSON.
 - Mobile runtime is a standalone Expo Android app using `expo-sqlite` and offline ML Kit text recognition.
 - Release flow is split into unsigned smoke builds, unsigned local installer builds, and cert-gated production release builds.
+- Release artifact sync copies the generated NSIS installer and blockmap to the updater asset names referenced by `latest.yml`.
+- Production release validation is clean for config/artifacts and remains intentionally gated on real Windows signing credentials.
 
 ---
 
@@ -47,7 +52,6 @@ Last verified on 2026-06-10:
 
 | Priority | Target | Reason |
 | :--- | :--- | :--- |
-| High | Release-readiness sweep | Validate installer metadata, updater metadata, signing gates, and current dist artifacts before publishing. |
 | High | Manual UI smoke pass | Automated renderer tests cover behavior, but drag overlay and visual polish still need a live Electron smoke check. |
 | Medium | Documentation encoding cleanup | Several historical Markdown files contain mojibake from earlier Unicode box/icon characters. |
 | Medium | Staff deduplication plan | Blueprint still calls out duplicate matching as a future product capability. |
@@ -63,6 +67,8 @@ Before adding new features, run:
 rtk npm test
 rtk npm --prefix mobile test
 rtk npm --prefix mobile run typecheck
+rtk npm run validate:release-config
+rtk npm run validate:smoke
 ```
 
-Then choose one explicit target: release readiness, UI smoke, deduplication, archive workflow, or docs polish.
+Then choose one explicit target: UI smoke, deduplication, archive workflow, or docs polish.

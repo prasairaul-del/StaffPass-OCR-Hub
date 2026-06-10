@@ -34,6 +34,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Documented the three release states: unsigned smoke build, cert-ready guarded build, and production release with fresh updater metadata.
 
 ### Fixed
+- Release artifact sync now copies the freshly built installer to the updater asset filename referenced by `latest.yml`.
+- Release validation now checks installer checksum and size against `latest.yml`, and prints signing failures clearly.
 - Review saves now run inside a single SQLite transaction and roll back cleanly on constraint failures.
 - Confidence badges are centralized through `renderer/dom.js` and reused in queue and saved-record render paths.
 - Resolved `compareVersions` undefined crash in the updater/release flow.

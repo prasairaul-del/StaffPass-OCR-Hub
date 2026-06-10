@@ -143,7 +143,7 @@
 ### Download (Recommended)
 
 1. Go to [Releases](https://github.com/prasairaul-del/StaffPass-OCR-Hub/releases)
-2. Download the latest `StaffPass OCR Hub Setup X.X.X.exe`
+2. Download the latest `StaffPass-OCR-Hub-Setup-X.X.X.exe`
 3. Run the installer and follow the setup wizard
 4. Launch from the desktop shortcut or Start Menu
 
@@ -358,6 +358,9 @@ Last checked on 2026-06-10:
 | `rtk npm test` | Passed |
 | `rtk npm --prefix mobile test` | Passed |
 | `rtk npm --prefix mobile run typecheck` | Passed |
+| `rtk npm run validate:release-config` | Passed |
+| `rtk npm run validate:smoke` | Passed |
+| `rtk npm run validate:release` | Expected signing-gate failure only; release config and artifacts passed |
 
 Current implementation status:
 
@@ -366,6 +369,8 @@ Current implementation status:
 - Sidecar payloads are validated in JavaScript and Python.
 - OCR sidecar auto-restart is covered by tests.
 - Mobile TypeScript strict mode is enabled.
+- Release config, smoke artifacts, updater installer, checksum, size, and blockmap validation pass locally.
+- Production release remains intentionally gated on real Windows signing credentials.
 - Historical specs under `docs/superpowers/specs/` are implemented records, not pending task lists.
 
 ---
@@ -396,8 +401,8 @@ The output will be in the `dist_installer/` directory.
 Release states:
 
 1. `npm run dist:smoke` produces an unsigned `win-unpacked` directory for local verification only. It does not create an installer `.exe`.
-2. `npm run dist:installer:unsigned` produces an unsigned local NSIS installer `.exe` for test installs only. Do not publish it as a production release.
-3. `npm run dist:release` is the cert-ready guarded build. It requires the Windows signing environment before packaging the production installer.
+2. `npm run dist:installer:unsigned` produces an unsigned local NSIS installer `.exe` for test installs only, then syncs the updater asset name referenced by `latest.yml`. Do not publish it as a production release.
+3. `npm run dist:release` is the cert-ready guarded build. It requires the Windows signing environment before packaging the production installer and syncing the updater asset.
 4. `npm run validate:release` is the production release check. It requires fresh updater metadata, matching `package.json` and `dist_installer/latest.yml` versions, and the referenced installer artifact to exist on disk.
 
 **Note:** Windows Developer Mode must be enabled for `electron-builder` to extract `winCodeSign` (required for embedding the custom icon into the `.exe`). Without it, the installer will use the default Electron icon.
@@ -493,12 +498,15 @@ npm run validate:release
 git tag -a vX.Y.Z -m "vX.Y.Z: release notes"
 git push origin vX.Y.Z
 
-# Create GitHub release with installer attached
-gh release create vX.Y.Z "dist_installer/StaffPass OCR Hub Setup X.Y.Z.exe" \
+# Create GitHub release with updater metadata and matching installer asset attached
+gh release create vX.Y.Z \
+  "dist_installer/StaffPass-OCR-Hub-Setup-X.Y.Z.exe" \
+  "dist_installer/StaffPass-OCR-Hub-Setup-X.Y.Z.exe.blockmap" \
+  "dist_installer/latest.yml" \
   --title "vX.Y.Z: Title" --notes "Release notes here"
 ```
 
-**Important:** Production releases must be code-signed and regenerated from fresh updater metadata. Set `STAFFPASS_REQUIRE_SIGNING=1` with `CSC_LINK`/`WIN_CSC_LINK` or `CSC_NAME`/`WIN_CSC_NAME` before packaging the guarded release build. Use `validate:release-config` to check the draft-release GitHub settings without secrets, `validate:smoke` to confirm an unsigned smoke build is present, and `validate:release` to confirm the generated `latest.yml` stays aligned with the installer asset before publishing. The unsigned local installer is only for local installation testing and must not be attached to a public production release.
+**Important:** Production releases must be code-signed and regenerated from fresh updater metadata. Set `STAFFPASS_REQUIRE_SIGNING=1` with `CSC_LINK`/`WIN_CSC_LINK` or `CSC_NAME`/`WIN_CSC_NAME` before packaging the guarded release build. Use `validate:release-config` to check the draft-release GitHub settings without secrets, `validate:smoke` to confirm an unsigned smoke build is present, and `validate:release` to confirm the generated `latest.yml` stays aligned with the installer asset before publishing. The unsigned local installer is only for local installation testing and must not be attached to a public production release. The GitHub release asset must use the updater filename referenced by `latest.yml`, not only the local product-name installer file.
 
 ---
 
